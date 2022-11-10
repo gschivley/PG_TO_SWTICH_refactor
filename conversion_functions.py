@@ -6,6 +6,7 @@ from statistics import mean, mode
 
 import numpy as np
 import pandas as pd
+import math
 
 
 def switch_fuel_cost_table(
@@ -1365,25 +1366,29 @@ def variable_capacity_factors_table(
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
     # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
-    all_gen = all_gen.copy()
-    all_gen["region_resource_cluster"] = (
-        all_gen["region"]
-        + "_"
-        + all_gen["Resource"]
-        + "_"
-        + all_gen["cluster"].astype(str)
-    )
-    all_gen["gen_id"] = all_gen.index
-    all_gen_convert = dict(
-        zip(all_gen["region_resource_cluster"].to_list(), all_gen["gen_id"].to_list())
-    )
+    # all_gen = all_gen.copy()
+    # all_gen["region_resource_cluster"] = (
+    #     all_gen["region"]
+    #     + "_"
+    #     + all_gen["Resource"]
+    #     + "_"
+    #     + all_gen["cluster"].astype(str)
+    # )
+    # all_gen["gen_id"] = all_gen.index
+    # all_gen_convert = dict(
+    #     zip(all_gen["region_resource_cluster"].to_list(), all_gen["gen_id"].to_list())
+    # )
 
-    reg_res_cl = all_gen["region_resource_cluster"].to_list()
+    # reg_res_cl = all_gen["region_resource_cluster"].to_list()
+    reg_res_cl = all_gen["index"].to_list()
+    # reg_res_cl_copy =[str(i) for i in reg_res_cl]
+    # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
+
     var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
 
-    var_cap_fac["GENERATION_PROJECT"] = var_cap_fac["GENERATION_PROJECT"].apply(
-        lambda x: all_gen_convert[x]
-    )
+    # var_cap_fac["GENERATION_PROJECT"] = var_cap_fac["GENERATION_PROJECT"].apply(
+    #     lambda x: all_gen_convert[x]
+    # )
     # filter to final columns
     var_cap_fac = var_cap_fac[
         ["GENERATION_PROJECT", "timepoint", "gen_max_capacity_factor"]

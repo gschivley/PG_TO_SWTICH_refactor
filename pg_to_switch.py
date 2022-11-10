@@ -5,6 +5,7 @@ import os
 import sys
 import pandas as pd
 import numpy as np
+import math
 from datetime import datetime as dt
 
 from powergenome.resource_clusters import ResourceGroup
@@ -501,7 +502,7 @@ def main(settings_file: str, results_folder: str):
     pudl_engine, pudl_out, pg_engine = init_pudl_connection(
         freq="AS",
         start_year=min(settings.get("data_years")),
-        end_year=max(settings.get("data_years")),
+        end_year=max(settings.get("data_years"))
     )
     check_settings(settings, pg_engine)
     input_folder = cwd / settings["input_folder"]

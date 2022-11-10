@@ -1,298 +1,314 @@
 
 
-def gen_build_predetermined(
-    all_gen,
-    pudl_gen,
-    pudl_gen_entity,
-    pg_build,
-    manual_build_yr,
-    eia_Gen,
-    eia_Gen_prop,
-    plant_gen_manual,
-    plant_gen_manual_proposed,
-    plant_gen_manual_retired,
-    retirement_ages,
-):
-    """
-    Create the gen_build_predetermined table
-    Inputs
-        1) all_gen: from PowerGenome gc.create_all_generators()
-        2) pudl_gen: from PUDL generators_eia860
-            - retirement_date
-            - planned_retirement)date
-            - current_planned_operating_date
-        3) pudl_gen_entity: from PUDL generators_entity_eia
-            - operating_date
-        4) pg_build: from PowerGenome gc.units_model
-            - planned_retirement_date
-            - operating_date
-            - Operating Year
-            - retirement_year
-        5) manual_build_yr: dictionary of build years that were found manually (outside of PUDL and PG)
-        6) eia_Gen: eia operable plants
-        7) eia_Gen_prop: eia proposed plants
-        8) plant_gen_manual, plant_gen_manual_proposed, plant_gen_manual_retired: manually found build_years
-        9) retirement_ages: how many years until plant retires
-    Output columns
-        * GENERATION_PROJECT: index from all_gen
-        * build_year: using pudl_gen, pudl_gen_entity, eia excel file, and pg_build to get years
-        * gen_predetermined_cap: based on Cap_Size from all_gen
-        * gen_predetermined_storage_energy_mwh: based on capex_mwh from all_gen
-    Outputs
-        gen_buildpre: is the 'offical' table
-        gen_build_with_id: is gen_buildpre before 2020 was taken out and with plant_id in it
-    """
 
-    """
-    Use dictionaries to get the build year from the various sources of information
-    """
+import os
+import sys
+import pandas as pd
+import numpy as np
+from datetime import datetime as dt
 
-    # create dictionaries {plant_gen_id: date} from pudl_gen
-    plant_op_date_dict = create_dict_plantgen(
-        pudl_gen, "current_planned_operating_date"
-    )
-    plant_plan_ret_date_dict = create_dict_plantgen(pudl_gen, "planned_retirement_date")
-    plant_ret_date_dict = create_dict_plantgen(pudl_gen, "retirement_date")
+from powergenome.resource_clusters import ResourceGroup
+from pathlib import Path
+import sqlalchemy as sa
+import typer
 
-    # create dictionaries {plant_gen_id: date} from pudl_gen_entity
-    entity_op_date_dict = create_dict_plantgen(pudl_gen_entity, "operating_date")
+import pandas as pd
+from powergenome.fuels import fuel_cost_table
+from powergenome.generators import GeneratorClusters
+from powergenome.util import (
+    build_scenario_settings,
+    init_pudl_connection,
+    load_settings,
+    check_settings,
+)
+from powergenome.eia_opendata import fetch_fuel_prices
+import geopandas as gpd
+from powergenome.generators import *
+from powergenome.external_data import (
+    make_demand_response_profiles,
+    make_generator_variability,
+)
+from powergenome.GenX import add_misc_gen_values
+os.getcwd()
 
-    # create dictionaries {plant_gen_id: date} from pg_build
-    PG_pl_retire_date_dict = create_dict_plantgen(pg_build, "planned_retirement_date")
-    PG_retire_yr_dict = create_dict_plantgen(pg_build, "retirement_year")
-    PG_op_date_dict = create_dict_plantgen(pg_build, "operating_date")
-    PG_op_yr_dict = create_dict_plantgen(pg_build, "Operating Year")
+from conversion_functions import (
+    switch_fuel_cost_table,
+    switch_fuels,
+    create_dict_plantgen,
+    create_dict_plantpudl,
+    plant_dict,
+    plant_gen_id,
+    plant_pudl_id,
+    gen_build_predetermined,
+    gen_build_costs_table,
+    generation_projects_info,
+    hydro_timeseries,
+    load_zones_table,
+    fuel_market_tables,
+    timeseries,
+    timepoints_table,
+    hydro_timepoints_table,
+    graph_timestamp_map_table,
+    loads_table,
+    variable_capacity_factors_table,
+    transmission_lines_table,
+    balancing_areas,
+)
 
-    #  create dictionaries {plant_gen_id: date} from eia excel file
-    eia_Gen_dict = create_dict_plantgen(eia_Gen, "Operating Year")
-    eia_Gen_prop_dict = create_dict_plantgen(eia_Gen_prop, "planned_operating_year")
+from powergenome.load_profiles import (
+    make_load_curves, 
+    add_load_growth, 
+    make_final_load_curves, 
+    make_distributed_gen_profiles,
+)
 
-    """
-    Bring in dates based on dictionaries and the plant_gen_id column
-    """
-    # based on pudl_gen
-    pg_build["op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_op_date_dict)
-    )
-    pg_build["plan_retire_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_plan_ret_date_dict)
-    )
-    pg_build["retirement_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_ret_date_dict)
-    )
+if not sys.warnoptions:
+    import warnings
 
-    # based on pudl_gen_entity
-    pg_build["entity_op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, entity_op_date_dict)
-    )
+    warnings.simplefilter("ignore")
 
-    # based on pg_build
-    pg_build["PG_pl_retire"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_pl_retire_date_dict)
-    )
-    pg_build["PG_retire_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_retire_yr_dict)
-    )
-    pg_build["PG_op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_op_date_dict)
-    )
-    pg_build["PG_op_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_op_yr_dict)
-    )
+cwd = Path.cwd()
 
-    # based on manual_build
-    pg_build["manual_yr"] = pg_build["plant_id_eia"].apply(
-        lambda x: plant_dict(x, manual_build_yr)
-    )
+settings_path = (
+    cwd / "settings_TD_east.yml" 
+)
+settings = load_settings(settings_path)
 
-    # based on eia excel
-    pg_build["eia_gen_op_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, eia_Gen_dict)
-    )
-    pg_build["proposed_year"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, eia_Gen_prop_dict)
-    )
+pudl_engine, pudl_out, pg_engine = init_pudl_connection(
+        freq="AS",
+        start_year=min(settings.get("data_years")),
+        end_year=max(settings.get("data_years")),)
+check_settings(settings, pg_engine)
+input_folder = cwd / settings["input_folder"]
+settings["input_folder"] = input_folder
+scenario_definitions = pd.read_csv(
+    input_folder / settings["scenario_definitions_fn"])
+scenario_settings = build_scenario_settings(settings, scenario_definitions)
 
-    # based on eia excel manual dictionary
-    pg_build["eia_gen_manual_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual)
-    )
-    pg_build["proposed_manual_year"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual_proposed)
-    )
-    pg_build["eia_gen_retired_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual_retired)
-    )
+gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, scenario_settings[2020]["p1"])
 
-    """
-    Manipulating the build and retirement year data
-        - change to year instead of date, 
-        - bring all years into one column
-        - remove nans
-    """
 
-    # the columns that have the dates as datetime
-    columns = [
-        "operating_date",
-        "op_date",
-        "plan_retire_date",
+all_gen = gc.create_all_generators()
+all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
+existing_gen = all_gen.loc[
+    all_gen["plant_id_eia"].notna(), :
+]  # gc.create_region_technology_clusters()
+
+data_years = gc.settings.get("data_years", [])
+if not isinstance(data_years, list):
+    data_years = [data_years]
+data_years = [str(y) for y in data_years]
+s = f"""
+    SELECT
+        "plant_id_eia",
+        "generator_id",
+        "operational_status",
         "retirement_date",
-        "entity_op_date",
         "planned_retirement_date",
-        "PG_pl_retire",
-        "PG_op_date",
-    ]
-    # change those columns to just year (instead of longer date)
-    for c in columns:
-        try:
-            pg_build[c] = pd.DatetimeIndex(pg_build[c]).year
-        except:
-            pass
+        "current_planned_operating_date"
+    FROM generators_eia860
+    WHERE strftime('%Y',report_date) in ({','.join('?'*len(data_years))})
+    """
+# generators_eia860 = pd.read_sql_table("generators_eia860", pudl_engine)
+generators_eia860 = pd.read_sql_query(
+    s,
+    pudl_engine,
+    params=data_years,
+    parse_dates=[
+        "planned_retirement_date",
+        "retirement_date",
+        "current_planned_operating_date",
+    ],
+)
 
-    op_columns = [
-        "operating_date",
-        "op_date",
-        "entity_op_date",
-        "PG_op_date",
-        "Operating Year",
+generators_entity_eia = pd.read_sql_table("generators_entity_eia", pudl_engine)
+# create copies of PUDL tables and filter to relevant columns
+pudl_gen = generators_eia860.copy()
+pudl_gen = pudl_gen[
+    [
+        "plant_id_eia",
+        "generator_id",
+        "operational_status",
+        "retirement_date",
+        "planned_retirement_date",
+        "current_planned_operating_date",
+    ]
+]  #'utility_id_eia',
+
+pudl_gen_entity = generators_entity_eia.copy()
+pudl_gen_entity = pudl_gen_entity[
+    ["plant_id_eia", "generator_id", "operating_date"]
+]
+
+eia_Gen = gc.operating_860m
+eia_Gen = eia_Gen[
+    [
+        "utility_id_eia",
+        "utility_name",
+        "plant_id_eia",
+        "plant_name",
+        "generator_id",
+        "operating_year",
+        "planned_retirement_year",
+    ]
+]
+eia_Gen = eia_Gen.loc[eia_Gen["plant_id_eia"].notna(), :]
+
+# create identifier to connect to powergenome data
+eia_Gen["plant_gen_id"] = (
+    eia_Gen["plant_id_eia"].astype(str) + "_" + eia_Gen["generator_id"]
+)
+
+eia_Gen_prop = gc.proposed_gens.reset_index()
+eia_Gen_prop = eia_Gen_prop[
+    [
+        # "utility_id_eia",
+        # "utility_name",
+        "plant_id_eia",
+        # "plant_name",
+        "generator_id",
         "planned_operating_year",
-        "manual_yr",
-        "PG_op_yr",
-        "eia_gen_op_yr",
-        "eia_gen_manual_yr",
-        "proposed_year",
-        "proposed_manual_year",
     ]
-    pg_build["build_final"] = pg_build[op_columns].max(axis=1)
-    # get all build years into one column (includes manual dates and proposed dates)
+]
+eia_Gen_prop = eia_Gen_prop.loc[eia_Gen_prop["plant_id_eia"].notna(), :]
+eia_Gen_prop["plant_gen_id"] = (
+    eia_Gen_prop["plant_id_eia"].astype(str) + "_" + eia_Gen_prop["generator_id"]
+)
 
-    plant_unit_tech = all_gen.dropna(subset=["plant_pudl_id"])[
-        ["plant_pudl_id", "technology"]
-    ]
-    plant_unit_tech = plant_unit_tech.drop_duplicates(subset=["plant_pudl_id"])
-    plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
-    pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
-    pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
-    pg_build["calc_retirement_year"] = (
-        pg_build["build_final"] + pg_build["retirement_age"]
-    )
-    if not pg_build.query("retirement_age.isna()").empty:
-        missing_techs = pg_build.query("retirement_age.isna()")["technology"].unique()
-        print(f"The technologies {missing_techs} do not have retirement ages.")
-    ret_columns = [
+# create copies of potential_build_yr (powergenome)
+pg_build = gc.units_model.copy()
+pg_build = pg_build[
+    [
+        "plant_id_eia",
+        "generator_id",
+        "unit_id_pudl",
+        "planned_operating_year",
         "planned_retirement_date",
+        "operating_date",
+        "operating_year",
         "retirement_year",
-        "plan_retire_date",
-        "retirement_date",
-        "PG_pl_retire",
-        "PG_retire_yr",
-        "eia_gen_retired_yr",
-        "calc_retirement_year",
     ]
-    pg_build["retire_year_final"] = pg_build[ret_columns].min(axis=1)
+]
 
-    """
-    Start creating the gen_build_predetermined table
-    """
-    # base it off of PowerGenome all_gen
-    gen_buildpre = all_gen.copy()
-    gen_buildpre = gen_buildpre[
-        [
-            "index",
-            "plant_id_eia",
-            "Cap_Size",
-            "capex_mwh",
-            "region",
-            "plant_pudl_id",
-            "technology",
-        ]
-    ]
+retirement_ages = settings.get("retirement_ages")
 
-    # based GENERATION_PROJECT off of the index of all_gen
-    gen_buildpre["GENERATION_PROJECT"] = gen_buildpre.index + 1
+# add in the plant+generator ids to pg_build and pudl tables (plant_id_eia + generator_id)
+pudl_gen = plant_gen_id(pudl_gen)
+pudl_gen_entity = plant_gen_id(pudl_gen_entity)
+pg_build = plant_gen_id(pg_build)
 
-    # this ignores new builds
-    new_builds = gen_buildpre[gen_buildpre["index"].isna()]
-    gen_buildpre = gen_buildpre[gen_buildpre["index"].notna()]
+# add in the plant+pudl id to the all_gen and pg_build tables (plant_id_eia + unit_pudl_id)
+pg_build = plant_pudl_id(pg_build)
+all_gen = plant_pudl_id(all_gen)
 
-    # create dictionary to go from pg_build to gen_buildpre (build_year)
-    pg_build_buildyr = create_dict_plantpudl(pg_build, "build_final")
-    gen_buildpre["build_year"] = gen_buildpre["plant_pudl_id"].apply(
-        lambda x: plant_dict(x, pg_build_buildyr)
-    )
+load_curves = make_final_load_curves(pg_engine, scenario_settings[2020]["p1"])
+timeseries_df = timeseries(load_curves, max_weight=20.2778, avg_weight=283.8889, ts_duration_of_tp=4, 
+                        ts_num_tps=6)
+timeseries_dates = timeseries_df['timeseries'].to_list()
+timestamp_interval = ['00', '04', '08', '12','16', '20'] # should align with ts_duration_of_tp and ts_num_tps
+timepoints_df = timepoints_table(timeseries_dates, timestamp_interval)
+# create lists and dictionary for later use
+timepoints_timestamp = timepoints_df['timestamp'].to_list() # timestamp list
+timepoints_tp_id = timepoints_df['timepoint_id'].to_list() # timepoint_id list
+timepoints_dict = dict(zip(timepoints_timestamp, timepoints_tp_id)) # {timestamp: timepoint_id}
 
-    # create dictionary to go from pg_build to gen_buildpre (retirement_year)
-    pg_retireyr = pg_build["retire_year_final"].to_list()
-    pg_build_retireyr = create_dict_plantpudl(pg_build, "retire_year_final")
-    gen_buildpre["retirement_year"] = gen_buildpre["plant_pudl_id"].apply(
-        lambda x: plant_dict(x, pg_build_retireyr)
-    )
+period_list = ['2020', '2030', '2040','2050']
+loads, loads_with_year_hour = loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
+# for fuel_cost and regional_fuel_market issue
+dummy_df = pd.DataFrame({'TIMEPOINT':timepoints_tp_id})
+dummy_df.insert(0,'LOAD_ZONE','loadzone')
+dummy_df.insert(2,'zone_demand_mw',0)
+loads = loads.append(dummy_df)
 
-    # for plants that still don't have a build year but have a retirement year.
-    # Base build year off of retirement year: retirement year - retirement age (based on technology)
-    # check to see if it is na or None if you get blank build years
-    mask = gen_buildpre["build_year"] == "None"
-    nans = gen_buildpre[mask]
+year_hour = loads_with_year_hour['year_hour'].to_list()
+all_gen_variability = make_generator_variability(all_gen)
 
-    if not nans.empty:
-        gen_buildpre.loc[mask, "build_year"] = nans.apply(
-            lambda row: float(row.retirement_year) - retirement_ages[row.technology],
-            axis=1,
-        )
+v_capacity_factors = all_gen_variability.copy().transpose()
+v_capacity_factors["GENERATION_PROJECT"] = v_capacity_factors.index
+v_c_f = v_capacity_factors.melt(
+    id_vars="GENERATION_PROJECT",
+    var_name="year_hour",
+    value_name="gen_max_capacity_factor",
+)
+# reduce variability to just the hours of the year that have a timepoint
+v_c_f = v_c_f[v_c_f["year_hour"].isin(year_hour)]
 
-    # don't include new builds in gen_build_predetermined
-    #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
-    #     new_builds = new_builds[['GENERATION_PROJECT', 'Cap_Size', 'capex_mwh']]
-    #     new_builds2020 = new_builds.copy()
-    #     new_builds2030 = new_builds.copy()
-    #     new_builds2040 = new_builds.copy()
-    #     new_builds2050 = new_builds.copy()
-    #     new_builds2020['build_year'] = 2020
-    #     new_builds2030['build_year'] = 2030
-    #     new_builds2040['build_year'] = 2040
-    #     new_builds2050['build_year'] = 2050
+mod_vcf = v_c_f.copy()
+# get the dates from hour of the year
+start = pd.to_datetime("2021-01-01 0:00")  # 2020 is a leap year
+mod_vcf["date"] = mod_vcf["year_hour"].apply(
+    lambda x: start + pd.to_timedelta(x, unit="H")
+)
+mod_vcf["reformat"] = mod_vcf["date"].apply(lambda x: x.strftime("%Y%m%d%H"))
+mod_vcf["reformat"] = mod_vcf["reformat"].astype(str)
+date_list = mod_vcf["reformat"].to_list()
+# change 2021 to correct period year/decade
+# to get the timestamp
+updated_dates20 = ["2020" + x[4:] for x in date_list]
+updated_dates30 = ["2030" + x[4:] for x in date_list]
+updated_dates40 = ["2040" + x[4:] for x in date_list]
+updated_dates50 = ["2050" + x[4:] for x in date_list]
+mod_vcf1 = mod_vcf.copy()
+mod_vcf2 = mod_vcf.copy()
+mod_vcf3 = mod_vcf.copy()
+mod_vcf4 = mod_vcf.copy()
+mod_vcf1["timestamp"] = updated_dates20
+mod_vcf2["timestamp"] = updated_dates30
+mod_vcf3["timestamp"] = updated_dates40
+mod_vcf4["timestamp"] = updated_dates50
+# go from timestamp to timepoint
+mod_vcf1["timepoint"] = mod_vcf1["timestamp"].apply(lambda x: timepoints_dict[x])
+mod_vcf2["timepoint"] = mod_vcf2["timestamp"].apply(lambda x: timepoints_dict[x])
+mod_vcf3["timepoint"] = mod_vcf3["timestamp"].apply(lambda x: timepoints_dict[x])
+mod_vcf4["timepoint"] = mod_vcf4["timestamp"].apply(lambda x: timepoints_dict[x])
+# get final columns
+mod_vcf1.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
+mod_vcf2.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
+mod_vcf3.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
+mod_vcf4.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
+# bring all decades together
+var_cap_fac = pd.concat([mod_vcf1, mod_vcf2, mod_vcf3, mod_vcf4], ignore_index=True)
 
-    # filter to final columns
-    # gen_build_with_id is an unmodified version of gen_build_pre (still has 2020 plant years)
-    gen_build_with_id = gen_buildpre.copy()
-    gen_build_with_id = gen_buildpre[
-        [
-            "GENERATION_PROJECT",
-            "build_year",
-            "plant_id_eia",
-            "retirement_year",
-            "plant_pudl_id",
-            "technology",
-        ]
-    ]  # this table is for comparison/testing only
-    gen_buildpre = gen_buildpre[
-        ["GENERATION_PROJECT", "build_year", "Cap_Size", "capex_mwh"]
-    ]
+# only get all_gen plants that are wind or solar
+technology = all_gen["technology"].to_list()
 
-    # don't include new builds
-    #     gen_buildpre_combined = pd.concat([gen_buildpre, new_builds2020, new_builds2030, new_builds2040, new_builds2050],
-    #                                      ignore_index=True)
-    #     gen_buildpre = gen_buildpre.append([new_builds2020, new_builds2030, new_builds2040, new_builds2050],
-    #                                        ignore_index=True)
+def Filter(list1, list2):
+    return [n for n in list1 if any(m in n for m in list2)]
 
-    gen_buildpre.rename(
-        columns={
-            "Cap_Size": "gen_predetermined_cap",
-            "capex_mwh": "gen_predetermined_storage_energy_mwh",
-        },
-        inplace=True,
-    )
-    # based on REAM
-    gen_buildpre["gen_predetermined_storage_energy_mwh"] = gen_buildpre[
-        "gen_predetermined_storage_energy_mwh"
-    ].fillna(".")
+wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+all_gen.loc[all_gen["technology"].isin(wind_solar), "gen_is_variable"] = True
+all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
-    gen_buildpre["build_year"] = gen_buildpre["build_year"].astype(float).astype(int)
-    #     gen_buildpre['GENERATION_PROJECT'] = gen_buildpre['GENERATION_PROJECT'].astype(str)
+# get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
+# all_gen = all_gen.copy()
+# all_gen["region_resource_cluster"] = (
+#     all_gen["region"]
+#     + "_"
+#     + all_gen["Resource"]
+#     + "_"
+#     + all_gen["cluster"].astype(str)
+# )
+# all_gen["gen_id"] = all_gen.index
+# all_gen_convert = dict(
+#     zip(all_gen["region_resource_cluster"].to_list(), all_gen["gen_id"].to_list())
+# )
 
-    # SWITCH doesn't like having build years that are in the period
-    gen_buildpre.drop(
-        gen_buildpre[gen_buildpre["build_year"] == 2020].index, inplace=True
-    )
+# reg_res_cl = all_gen["region_resource_cluster"].to_list()
+reg_res_cl = all_gen["index"].to_list()
+reg_res_cl =[int(i) for i in reg_res_cl]
+reg_res_cl =[str(i) for i in reg_res_cl]
 
-    return gen_buildpre, gen_build_with_id
+var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
+
+# var_cap_fac["GENERATION_PROJECT"] = var_cap_fac["GENERATION_PROJECT"].apply(
+#     lambda x: all_gen_convert[x]
+# )
+# filter to final columns
+var_cap_fac = var_cap_fac[
+    ["GENERATION_PROJECT", "timepoint", "gen_max_capacity_factor"]
+]
+var_cap_fac["GENERATION_PROJECT"] = (
+    var_cap_fac["GENERATION_PROJECT"] + 1
+) 
+
+vcf = variable_capacity_factors_table(all_gen_variability, year_hour, timepoints_dict, all_gen)
