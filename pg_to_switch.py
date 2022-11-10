@@ -31,7 +31,7 @@ from powergenome.external_data import (
 from powergenome.GenX import add_misc_gen_values
 os.getcwd()
 
-from powergenome.conversion_functions import (
+from conversion_functions import (
     switch_fuel_cost_table,
     switch_fuels,
     create_dict_plantgen,
