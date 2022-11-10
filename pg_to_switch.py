@@ -1,6 +1,3 @@
-
-
-
 import os
 import sys
 import pandas as pd
@@ -30,7 +27,6 @@ from powergenome.external_data import (
     make_generator_variability,
 )
 from powergenome.GenX import add_misc_gen_values
-os.getcwd()
 
 from conversion_functions import (
     switch_fuel_cost_table,
@@ -57,9 +53,9 @@ from conversion_functions import (
 )
 
 from powergenome.load_profiles import (
-    make_load_curves, 
-    add_load_growth, 
-    make_final_load_curves, 
+    make_load_curves,
+    add_load_growth,
+    make_final_load_curves,
     make_distributed_gen_profiles,
 )
 
@@ -67,7 +63,6 @@ if not sys.warnoptions:
     import warnings
 
     warnings.simplefilter("ignore")
-
 
 
 def fuel_files(
@@ -104,7 +99,9 @@ def gen_projects_info_file(
     # pudl_engine: sa.engine,
     # settings_list: List[dict],
     # settings_file: str,
-    complete_gens: pd.DataFrame, settings: dict, out_folder: Path
+    complete_gens: pd.DataFrame,
+    settings: dict,
+    out_folder: Path,
 ):
 
     if settings.get("cogen_tech"):
@@ -129,6 +126,7 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
         }
     if settings.get("baseload_tech"):
         baseload_tech = settings.get("baseload_tech")
@@ -152,6 +150,7 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
         }
     if settings.get("energy_tech"):
         energy_tech = settings["energy_tech"]
@@ -175,6 +174,7 @@ def gen_projects_info_file(
             "Battery_*_Moderate": "Electricity",
             "NaturalGas_CCS100_Moderate": "Naturalgas",
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": "Solar",
         }
     if settings.get("forced_outage_tech"):
         forced_outage_tech = settings["forced_outage_tech"]
@@ -198,6 +198,7 @@ def gen_projects_info_file(
             "Battery_*_Moderate": 0.02,
             "NaturalGas_CCS100_Moderate": 0.4,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
         }
     if settings.get("sched_outage_tech"):
         sched_outage_tech = settings["sched_outage_tech"]
@@ -221,6 +222,7 @@ def gen_projects_info_file(
             "Battery_*_Moderate": 0.01,
             "NaturalGas_CCS100_Moderate": 0.6,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
         }
 
     gen_project_info = generation_projects_info(
@@ -234,20 +236,38 @@ def gen_projects_info_file(
         forced_outage_tech,
     )
 
-    gen_type_tech = {'Onshore Wind Turbine':'Wind', 'Biomass': 'Biomass', 'Conventional Hydroelectric':'Hydro', 
-                'Conventional Steam Coal': 'Coal', 'Natural Gas Fired Combined Cycle':'Gas', 
-                 'Natural Gas Fired Combustion Turbine':'Gas', 'Natural Gas Steam Turbine':'Gas', 
-                'Nuclear':'Nuclear', 'Solar Photovoltaic':'Solar', 'Hydroelectric Pumped Storage':'Hydro', 
-                'Offshore Wind Turbine':'Wind', 'NaturalGas_CCCCSAvgCF_Conservative':'Naturalgas', 
-                'NaturalGas_CCAvgCF_Moderate':'Naturalgas', 'NaturalGas_CTAvgCF_Moderate':'Naturalgas', 
-                 'Battery_*_Moderate':'Storage', 'NaturalGas_CCS100_Moderate':'Naturalgas'}
+    gen_type_tech = {
+        "Onshore Wind Turbine": "Wind",
+        "Biomass": "Biomass",
+        "Conventional Hydroelectric": "Hydro",
+        "Conventional Steam Coal": "Coal",
+        "Natural Gas Fired Combined Cycle": "Gas",
+        "Natural Gas Fired Combustion Turbine": "Gas",
+        "Natural Gas Steam Turbine": "Gas",
+        "Nuclear": "Nuclear",
+        "Solar Photovoltaic": "Solar",
+        "Hydroelectric Pumped Storage": "Hydro",
+        "Offshore Wind Turbine": "Wind",
+        "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
+        "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
+        "NaturalGas_CTAvgCF_Moderate": "Naturalgas",
+        "Battery_*_Moderate": "Storage",
+        "NaturalGas_CCS100_Moderate": "Naturalgas",
+        "UtilityPV_Class1_Moderate": "Solar",
+    }
 
-    gen_tech = gen_project_info['gen_tech'].unique()
-    graph_tech_types_table = pd.DataFrame(columns=['map_name', 'gen_type', 'gen_tech', 'energy_source'])
-    graph_tech_types_table['gen_tech'] = gen_tech
-    graph_tech_types_table['energy_source'] = graph_tech_types_table['gen_tech'].apply(lambda x: energy_tech[x])
-    graph_tech_types_table['map_name'] = 'default'
-    graph_tech_types_table['gen_type'] = graph_tech_types_table['gen_tech'].apply(lambda x: gen_type_tech[x])
+    gen_tech = gen_project_info["gen_tech"].unique()
+    graph_tech_types_table = pd.DataFrame(
+        columns=["map_name", "gen_type", "gen_tech", "energy_source"]
+    )
+    graph_tech_types_table["gen_tech"] = gen_tech
+    graph_tech_types_table["energy_source"] = graph_tech_types_table["gen_tech"].apply(
+        lambda x: energy_tech[x]
+    )
+    graph_tech_types_table["map_name"] = "default"
+    graph_tech_types_table["gen_type"] = graph_tech_types_table["gen_tech"].apply(
+        lambda x: gen_type_tech[x]
+    )
 
     # settings = load_settings(path=settings_file)
     # pudl_engine, pudl_out, pg_engine = init_pudl_connection(
@@ -256,18 +276,22 @@ def gen_projects_info_file(
     #     end_year=max(settings.get("data_years")),
     # )
 
-    # gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])    
+    # gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
     # fuel_prices = gc.fuel_prices
-    fuels = fuel_prices['fuel'].unique()
+    fuels = fuel_prices["fuel"].unique()
     fuels = [fuel.capitalize() for fuel in fuels]
-    non_fuel_table = graph_tech_types_table[~graph_tech_types_table['energy_source'].isin(fuels)]
-    non_fuel_energy = list(set(non_fuel_table['energy_source'].to_list()))
+    non_fuel_table = graph_tech_types_table[
+        ~graph_tech_types_table["energy_source"].isin(fuels)
+    ]
+    non_fuel_energy = list(set(non_fuel_table["energy_source"].to_list()))
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
-
-    gen_project_info['gen_full_load_heat_rate'] = gen_project_info.apply(
-                lambda row: '.' if row.gen_energy_source in non_fuel_energy else row.gen_full_load_heat_rate,  axis=1)
-
+    gen_project_info["gen_full_load_heat_rate"] = gen_project_info.apply(
+        lambda row: "."
+        if row.gen_energy_source in non_fuel_energy
+        else row.gen_full_load_heat_rate,
+        axis=1,
+    )
 
     # Do I need to set full load heat rate to "." for non-fuel energy generators?
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
@@ -278,11 +302,13 @@ def gen_prebuild_newbuild_info_files(
     pudl_engine: sa.engine,
     settings_list: List[dict],
     out_folder: Path,
-    pg_engine: sa.engine   
+    pg_engine: sa.engine,
 ):
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
     all_gen = gc.create_all_generators()
+    all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
+    all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
@@ -419,7 +445,10 @@ def gen_prebuild_newbuild_info_files(
     for settings in settings_list:
         gc.settings = settings
         new_gen = gc.create_new_generators()
+        new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
+        new_gen["technology"] = new_gen["technology"].str.rstrip("_")
         new_gen["build_year"] = settings["model_year"]
+        new_gen["GENERATION_PROJECT"] = new_gen["Resource"]
         df_list.append(new_gen)
 
     newgens = pd.concat(df_list, ignore_index=True)
@@ -448,32 +477,51 @@ def gen_prebuild_newbuild_info_files(
         subset=["Resource"]
     )
     complete_gens = add_misc_gen_values(complete_gens, gc.settings)
-    gen_projects_info_file(gc.fuel_prices,complete_gens, gc.settings, out_folder)
+    gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
-    timeseries_df = timeseries(load_curves, max_weight=20.2778, avg_weight=283.8889, ts_duration_of_tp=4, 
-                          ts_num_tps=6)
-    timeseries_dates = timeseries_df['timeseries'].to_list()
-    timestamp_interval = ['00', '04', '08', '12','16', '20'] # should align with ts_duration_of_tp and ts_num_tps
+    timeseries_df = timeseries(
+        load_curves,
+        max_weight=20.2778,
+        avg_weight=283.8889,
+        ts_duration_of_tp=4,
+        ts_num_tps=6,
+    )
+    timeseries_dates = timeseries_df["timeseries"].to_list()
+    timestamp_interval = [
+        "00",
+        "04",
+        "08",
+        "12",
+        "16",
+        "20",
+    ]  # should align with ts_duration_of_tp and ts_num_tps
     timepoints_df = timepoints_table(timeseries_dates, timestamp_interval)
     # create lists and dictionary for later use
-    timepoints_timestamp = timepoints_df['timestamp'].to_list() # timestamp list
-    timepoints_tp_id = timepoints_df['timepoint_id'].to_list() # timepoint_id list
-    timepoints_dict = dict(zip(timepoints_timestamp, timepoints_tp_id)) # {timestamp: timepoint_id}
+    timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
+    timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
+    timepoints_dict = dict(
+        zip(timepoints_timestamp, timepoints_tp_id)
+    )  # {timestamp: timepoint_id}
 
-    period_list = ['2020', '2030', '2040','2050']
-    loads, loads_with_year_hour = loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
+    period_list = ["2020", "2030", "2040", "2050"]
+    loads, loads_with_year_hour = loads_table(
+        load_curves, timepoints_timestamp, timepoints_dict, period_list
+    )
     # for fuel_cost and regional_fuel_market issue
-    dummy_df = pd.DataFrame({'TIMEPOINT':timepoints_tp_id})
-    dummy_df.insert(0,'LOAD_ZONE','loadzone')
-    dummy_df.insert(2,'zone_demand_mw',0)
+    dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
+    dummy_df.insert(0, "LOAD_ZONE", "loadzone")
+    dummy_df.insert(2, "zone_demand_mw", 0)
     loads = loads.append(dummy_df)
 
-    year_hour = loads_with_year_hour['year_hour'].to_list()
+    year_hour = loads_with_year_hour["year_hour"].to_list()
     all_gen_variability = make_generator_variability(all_gen)
-    vcf = variable_capacity_factors_table(all_gen_variability, year_hour, timepoints_dict, all_gen)
-    
+    all_gen_variability.columns = all_gen["Resource"]
+    vcf = variable_capacity_factors_table(
+        all_gen_variability, year_hour, timepoints_dict, all_gen
+    )
+
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
     ###
@@ -502,7 +550,7 @@ def main(settings_file: str, results_folder: str):
     pudl_engine, pudl_out, pg_engine = init_pudl_connection(
         freq="AS",
         start_year=min(settings.get("data_years")),
-        end_year=max(settings.get("data_years"))
+        end_year=max(settings.get("data_years")),
     )
     check_settings(settings, pg_engine)
     input_folder = cwd / settings["input_folder"]
@@ -526,7 +574,9 @@ def main(settings_file: str, results_folder: str):
             settings_list.append(scenario_settings[year][case_id])
 
         gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
-        gen_prebuild_newbuild_info_files(gc, pudl_engine, settings_list, case_folder, pg_engine)
+        gen_prebuild_newbuild_info_files(
+            gc, pudl_engine, settings_list, case_folder, pg_engine
+        )
         fuel_files(
             fuel_prices=gc.fuel_prices,
             planning_years=case_years,
@@ -535,8 +585,6 @@ def main(settings_file: str, results_folder: str):
             fuel_emission_factors=settings["fuel_emission_factors"],
             out_folder=case_folder,
         )
-
-
 
 
 if __name__ == "__main__":

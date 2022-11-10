@@ -331,9 +331,12 @@ def gen_build_predetermined(
     """
     # base it off of PowerGenome all_gen
     gen_buildpre = all_gen.copy()
+    # Use the unique "Resource" column for the generation project ID
+    gen_buildpre["GENERATION_PROJECT"] = gen_buildpre["Resource"]
     gen_buildpre = gen_buildpre[
         [
             "index",
+            "GENERATION_PROJECT",
             "plant_id_eia",
             "Cap_Size",
             "capex_mwh",
@@ -342,9 +345,6 @@ def gen_build_predetermined(
             "technology",
         ]
     ]
-
-    # based GENERATION_PROJECT off of the index of all_gen
-    gen_buildpre["GENERATION_PROJECT"] = gen_buildpre.index + 1
 
     # this ignores new builds
     new_builds = gen_buildpre[gen_buildpre["index"].isna()]
@@ -410,6 +410,8 @@ def gen_build_predetermined(
     #     gen_buildpre = gen_buildpre.append([new_builds2020, new_builds2030, new_builds2040, new_builds2050],
     #                                        ignore_index=True)
 
+    # TODO: #1 why is "capex_mwh" being renamed to "gen_predetermined_storage_energy_mwh"?
+    # TODO: #2 should use Existing_Cap_MW instead of Cap_Size for existing capacity
     gen_buildpre.rename(
         columns={
             "Cap_Size": "gen_predetermined_cap",
@@ -422,7 +424,7 @@ def gen_build_predetermined(
         "gen_predetermined_storage_energy_mwh"
     ].fillna(".")
 
-    gen_buildpre["build_year"] = gen_buildpre["build_year"].astype(float).astype(int)
+    gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
     #     gen_buildpre['GENERATION_PROJECT'] = gen_buildpre['GENERATION_PROJECT'].astype(str)
 
     # SWITCH doesn't like having build years that are in the period
@@ -456,7 +458,7 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
 
     existing = existing_gen.copy()
     #     existing = existing[['index','plant_id_eia']]
-    existing["GENERATION_PROJECT"] = existing.index + 1
+    existing["GENERATION_PROJECT"] = existing["Resource"]
     #     existing['GENERATION_PROJECT'] = existing['GENERATION_PROJECT'].astype(str)
     existing["build_year"] = existing["GENERATION_PROJECT"].apply(
         lambda x: build_yr_plantid_dict[x]
@@ -474,21 +476,11 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         ]
     ]
 
-    df_list = []
-    for year, df in newgens.groupby("build_year"):
-        # start the new GENERATION_PROJECT ids from the end of existing_gen (should tie out to same as gen_proj_info)
-        df["GENERATION_PROJECT"] = range(
-            existing.shape[0] + 1, existing.shape[0] + 1 + df.shape[0]
-        )
-        df["GENERATION_PROJECT"] = df["GENERATION_PROJECT"].astype(str)
-        df_list.append(df)
-    combined_new_gens = pd.concat(df_list)
-
-    combined_new_gens["gen_fixed_om"] = combined_new_gens[
-        "Fixed_OM_Cost_per_MWyr"
-    ].apply(lambda x: x * 1000)
-    combined_new_gens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
-    combined_new_gens.rename(
+    newgens["gen_fixed_om"] = newgens["Fixed_OM_Cost_per_MWyr"].apply(
+        lambda x: x * 1000
+    )
+    newgens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
+    newgens.rename(
         columns={
             "capex_mw": "gen_overnight_cost",
             "capex_mwh": "gen_storage_energy_overnight_cost",
@@ -496,7 +488,7 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         inplace=True,
     )
 
-    combined_new_gens = combined_new_gens[
+    newgens = newgens[
         [
             "GENERATION_PROJECT",
             "build_year",
@@ -506,25 +498,14 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         ]
     ]
 
-    gen_build_costs = existing.append(combined_new_gens, ignore_index=True)
+    gen_build_costs = existing.append(newgens, ignore_index=True)
 
-    gen_build_costs["build_year"] = (
-        gen_build_costs["build_year"].astype(float).astype(int)
-    )
+    gen_build_costs["build_year"] = gen_build_costs["build_year"].astype("Int64")
     #     gen_build_costs.drop('index', axis=1, inplace=True)
 
     # gen_storage_energy_overnight_cost should only be for batteries
-    all_gen["GP"] = all_gen.index + 1
-    batteries = all_gen[all_gen["technology"] == "Battery_*_Moderate"]
-    batteries_id = batteries["GP"].to_list()
-    #     gen_build_costs['gen_storage_energy_overnight_cost'] = gen_build_costs.apply(
-    #                 lambda row: row.gen_storage_energy_overnight_cost if row.GENERATION_PROJECT in
-    #                 batteries_id else '.',  axis=1)
-    gen_build_costs["GENERATION_PROJECT"] = gen_build_costs[
-        "GENERATION_PROJECT"
-    ].astype(int)
     gen_build_costs.loc[
-        ~gen_build_costs["GENERATION_PROJECT"].isin(batteries_id),
+        ~gen_build_costs["GENERATION_PROJECT"].str.contains("batter", case=False),
         "gen_storage_energy_overnight_cost",
     ] = "."
 
@@ -575,6 +556,7 @@ def generation_projects_info(
     """
 
     gen_project_info = all_gen.copy().reset_index(drop=True)
+    gen_project_info["technology"] = gen_project_info["technology"].str.rstrip("_")
 
     # get columns for GENERATION_PROJECT, gen_tech, gen_load_zone, gen_full_load_heat_rate, gen_variable_om,
     # gen_connect_cost_per_mw and gen_capacity_limit_mw
@@ -1361,42 +1343,18 @@ def variable_capacity_factors_table(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    wind_solar = set(Filter(technology, ["Wind", "Solar", "UtilityPV"]))
     all_gen.loc[all_gen["technology"].isin(wind_solar), "gen_is_variable"] = True
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
-    # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
-    # all_gen = all_gen.copy()
-    # all_gen["region_resource_cluster"] = (
-    #     all_gen["region"]
-    #     + "_"
-    #     + all_gen["Resource"]
-    #     + "_"
-    #     + all_gen["cluster"].astype(str)
-    # )
-    # all_gen["gen_id"] = all_gen.index
-    # all_gen_convert = dict(
-    #     zip(all_gen["region_resource_cluster"].to_list(), all_gen["gen_id"].to_list())
-    # )
-
-    # reg_res_cl = all_gen["region_resource_cluster"].to_list()
-    reg_res_cl = all_gen["index"].to_list()
-    reg_res_cl_copy =[str(i) for i in reg_res_cl]
-    reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
+    reg_res_cl = all_gen["Resource"]
 
     var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
 
-    # var_cap_fac["GENERATION_PROJECT"] = var_cap_fac["GENERATION_PROJECT"].apply(
-    #     lambda x: all_gen_convert[x]
-    # )
     # filter to final columns
     var_cap_fac = var_cap_fac[
         ["GENERATION_PROJECT", "timepoint", "gen_max_capacity_factor"]
     ]
-    var_cap_fac["GENERATION_PROJECT"] = (
-        var_cap_fac["GENERATION_PROJECT"] + 1
-    )  # switch error - can't be 0?
-    #     vcf['GENERATION_PROJECT'] = vcf['GENERATION_PROJECT'].astype(str)
 
     return var_cap_fac
 
