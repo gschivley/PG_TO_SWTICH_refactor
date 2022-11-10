@@ -1381,8 +1381,8 @@ def variable_capacity_factors_table(
 
     # reg_res_cl = all_gen["region_resource_cluster"].to_list()
     reg_res_cl = all_gen["index"].to_list()
-    # reg_res_cl_copy =[str(i) for i in reg_res_cl]
-    # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
+    reg_res_cl_copy =[str(i) for i in reg_res_cl]
+    reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
 
     var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
 
