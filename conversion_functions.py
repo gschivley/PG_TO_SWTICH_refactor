@@ -557,12 +557,14 @@ def generation_projects_info(
 
     gen_project_info = all_gen.copy().reset_index(drop=True)
     gen_project_info["technology"] = gen_project_info["technology"].str.rstrip("_")
+    gen_project_info["GENERATION_PROJECT"] = gen_project_info["Resource"]
 
     # get columns for GENERATION_PROJECT, gen_tech, gen_load_zone, gen_full_load_heat_rate, gen_variable_om,
     # gen_connect_cost_per_mw and gen_capacity_limit_mw
     gen_project_info = gen_project_info[
         [
             "index",
+            "GENERATION_PROJECT",
             "technology",
             "region",
             "Heat_Rate_MMBTU_per_MWh",
@@ -603,7 +605,7 @@ def generation_projects_info(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    wind_solar = set(Filter(technology, ["Wind", "Solar", "UtilityPV"]))
     gen_project_info.loc[
         gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
     ] = True
@@ -612,7 +614,7 @@ def generation_projects_info(
     )
 
     # gen_storage_efficiency and gen_store_to_release_ratio: battery info based on REAM
-    battery = set(Filter(technology, ["Battery"]))
+    battery = set(Filter(technology, ["Battery", "Batteries"]))
     gen_project_info.loc[
         gen_project_info["technology"].isin(battery), "gen_storage_efficiency"
     ] = (gen_project_info[["Eff_Up", "Eff_Down"]].mean(axis=1) ** 2)
@@ -669,7 +671,7 @@ def generation_projects_info(
         )
 
     # GENERATION_PROJECT - the all_gen.index column has NaNs for the new generators.  Use actual index for all_gen
-    gen_project_info["GENERATION_PROJECT"] = gen_project_info.index + 1
+    # gen_project_info["GENERATION_PROJECT"] = gen_project_info.index + 1
     gen_project_info["gen_dbid"] = gen_project_info["GENERATION_PROJECT"]
     # rename columns
     gen_project_info.rename(
