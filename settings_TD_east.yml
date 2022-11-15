@@ -20,7 +20,7 @@ input_folder: extra_inputs # Subfolder directly below the location of this setti
 case_id_description_fn: case_id_description.csv # Match the case_id with longer case_name. Taylor - [REQUIRED]
 scenario_definitions_fn: scenario_inputs.csv # Define policy/cost scenarios for each case. Taylor - [REQUIRED]
 demand_segments_fn: demand_segments_voll.csv # Taylor - [REQUIRED]
-
+hydro_variability_fn: regional_existing_hydro_profiles.csv # RR - download from Greg's google drive
 
 # TAYLOR - not including capacity_limit_spur_fn and demand_response_fn for now
 # demand_response_fn: heat_load_shifting.csv # Load profiles of DR resources by model_year and scenario # TAYLOR DON'T INCLUDE FOR NOW
@@ -41,7 +41,6 @@ reserves_fn: Reserves.csv
 # demand response - the DR should be added to the load profiles - set to "~" (None) or
 # "false".
 # regional_load_includes_demand_response: true
-
 
 # Time clustering/reduction parameters
 reduce_time_domain: false # If the generator and load profiles should be clustered. TAYLOR - SET TO FALSE

@@ -902,6 +902,8 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         timeseries_list.append(df2)
     hydro_final_df = pd.concat(timeseries_list, axis=0)
 
+    hydro_final_df = hydro_final_df.drop(columns=['outage_rate', 'hydro_min_flow_mw_raw', 'hydro_avg_flow_mw_raw'])
+
     return hydro_final_df
 
 

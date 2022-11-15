@@ -7,6 +7,10 @@ import pandas as pd
 import numpy as np
 import math
 from datetime import datetime as dt
+import ast
+import itertools
+from statistics import mode
+
 
 from powergenome.resource_clusters import ResourceGroup
 from pathlib import Path
@@ -93,6 +97,41 @@ def fuel_files(
         0,
         0,
     ]  # adding in a dummy fuel for regional_fuel_market
+
+    ### edit by RR
+    IPM_regions = regions
+    load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
+    # add in the dummy loadzone
+    load_zones.loc[len(load_zones.index)] = ['loadzone', 0, load_zones['zone_dbid'].max()+1]
+    load_zones.to_csv(out_folder / "load_zones.csv", index=False)
+
+
+    regional_fuel_markets = pd.DataFrame({'regional_fuel_market':'loadzone-Fuel','fuel':'Fuel'}, index=[0])
+    regional_fuel_markets
+
+    ### edited by RR. CHANGE COLUMN NAME from fuel to rfm.
+    zone_regional_fm = pd.DataFrame({'load_zone':'loadzone','rfm':'loadzone-Fuel'}, index=[0])
+    zone_regional_fm
+    # creating dummy values based on one load zone in REAM's input file
+    # regional_fuel_market should align with the regional_fuel_market table
+    fuel_supply_curves20 = pd.DataFrame({'period':[2020,2020,2020,2020,2020,2020], 'tier':[1,2,3,4,5,6],
+                                        'unit_cost':[1.9, 4.0, 487.5, 563.7, 637.8, 816.7], 
+                                        'max_avail_at_cost':[651929, 3845638,3871799,3882177,3889953,3920836]})
+    fuel_supply_curves20.insert(0,'regional_fuel_market','loadzone-Fuel')
+    fuel_supply_curves30 = fuel_supply_curves20.copy()
+    fuel_supply_curves30['period'] = 2030
+    fuel_supply_curves40 = fuel_supply_curves20.copy()
+    fuel_supply_curves40['period'] = 2040
+    fuel_supply_curves50 = fuel_supply_curves20.copy()
+    fuel_supply_curves50['period'] = 2050
+    fuel_supply_curves = pd.concat([fuel_supply_curves20, fuel_supply_curves30, fuel_supply_curves40,fuel_supply_curves50])
+    fuel_supply_curves
+
+    regional_fuel_markets.to_csv(out_folder / 'regional_fuel_markets.csv', index = False)
+    zone_regional_fm.to_csv(out_folder /'zone_to_regional_fuel_market.csv', index = False)
+    fuel_supply_curves.to_csv(out_folder /'fuel_supply_curves.csv', index = False)
+
+    ###
 
     fuel_cost.to_csv(out_folder / "fuel_cost.csv", index=False)
     fuels_table.to_csv(out_folder / "fuels.csv", index=False)
@@ -293,7 +332,8 @@ def gen_prebuild_newbuild_info_files(
     pudl_engine: sa.engine,
     settings_list: List[dict],
     out_folder: Path,
-    pg_engine: sa.engine   
+    pg_engine: sa.engine,
+    hydro_variability_new: pd.DataFrame 
 ):
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
@@ -302,6 +342,7 @@ def gen_prebuild_newbuild_info_files(
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
     ]  # gc.create_region_technology_clusters()
+
 
     data_years = gc.settings.get("data_years", [])
     if not isinstance(data_years, list):
@@ -476,6 +517,16 @@ def gen_prebuild_newbuild_info_files(
     timepoints_timestamp = timepoints_df['timestamp'].to_list() # timestamp list
     timepoints_tp_id = timepoints_df['timepoint_id'].to_list() # timepoint_id list
     timepoints_dict = dict(zip(timepoints_timestamp, timepoints_tp_id)) # {timestamp: timepoint_id}
+    hydro_timepoints_df = hydro_timepoints_table(timepoints_df)
+    hydro_timepoints_df
+
+    graph_timestamp_map = graph_timestamp_map_table(timeseries_df, timestamp_interval)
+    graph_timestamp_map
+    timeseries_df.to_csv(out_folder / 'timeseries.csv', index = False)
+    timepoints_df.to_csv(out_folder / 'timepoints.csv', index = False)
+    hydro_timepoints_df.to_csv(out_folder / 'hydro_timepoints.csv', index = False)
+    graph_timestamp_map.to_csv(out_folder / 'graph_timestamp_map.csv', index = False)
+
 
     period_list = ['2020', '2030', '2040','2050']
     loads, loads_with_year_hour = loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
@@ -489,12 +540,151 @@ def gen_prebuild_newbuild_info_files(
     all_gen_variability = make_generator_variability(all_gen)
     vcf = variable_capacity_factors_table(all_gen_variability, year_hour, timepoints_dict, all_gen)
     
+    balancing_tables(settings, pudl_engine, all_gen, out_folder)
+    hydro_timeseries_table = hydro_timeseries(existing_gen, hydro_variability_new, period_list)
+    hydro_timeseries_table.to_csv(out_folder / 'hydro_timeseries.csv', index=False)
+
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
     ###
 
     gen_buildpre.to_csv(out_folder / "gen_build_predetermined.csv", index=False)
     gen_build_costs.to_csv(out_folder / "gen_build_costs.csv", index=False)
+
+### edit by RR
+
+
+def other_tables(atb_data_year, out_folder):
+
+    # Based on REAM
+    carbon_policies_data = {'period':[2020, 2030, 2040, 2050], 'carbon_cap_tco2_per_yr':[222591761.6,
+                        149423302.5, 76328672.3, 0], 'carbon_cap_tco2_per_yr_CA':[57699000, 36292500, 11400000, 0],
+                       'carbon_cost_dollar_per_tco2':['.','.','.','.']}
+    carbon_policies_table = pd.DataFrame(carbon_policies_data)
+    carbon_policies_table
+
+    # interest and discount based on REAM
+    financials_data = {'base_financial_year':atb_data_year, 'interest_rate': 0.05, 'discount_rate':0.05}
+    financials_table = pd.DataFrame(financials_data, index=[0])
+    financials_table
+
+    # based on REAM
+    periods_data = {'INVESTMENT_PERIOD':[2020,2030,2040,2050], 'period_start':[2016,2026,2036,2046],
+               'period_end':[2025,2035,2045,2055]}
+    periods_table = pd.DataFrame(periods_data)
+    periods_table
+
+    carbon_policies_table.to_csv(out_folder / 'carbon_policies.csv', index = False)
+    financials_table.to_csv(out_folder / 'financials.csv', index = False)
+    periods_table.to_csv(out_folder / 'periods.csv', index = False)
+
+
+
+from powergenome.generators import load_ipm_shapefile
+from powergenome.GenX import (
+        network_line_loss,
+        network_max_reinforcement,
+        network_reinforcement_cost,
+        add_cap_res_network
+)
+from powergenome.transmission import (
+        agg_transmission_constraints,
+        transmission_line_distance,
+)
+from powergenome.util import (
+        init_pudl_connection, 
+        load_settings,
+        check_settings
+)
+from statistics import mean
+
+def transmission_tables(settings, 
+    out_folder,
+    pg_engine):
+    
+    '''
+    pulling in information from PowerGenome transmission notebook
+    Schivley Greg, PowerGenome, (2022), GitHub repository, 
+        https://github.com/PowerGenome/PowerGenome/blob/master/notebooks/Transmission.ipynb
+    '''
+    IPM_regions = settings["model_regions"]
+
+    transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
+    model_regions_gdf = load_ipm_shapefile(settings)
+
+    transmission_line_distance(
+        trans_constraints_df=transmission,
+        ipm_shapefile=model_regions_gdf,
+        settings=settings,
+    )
+
+    line_loss = network_line_loss(transmission=transmission, settings=settings)
+    network_reinforcement_cost = network_reinforcement_cost(transmission=transmission, settings=settings)
+    network_max_reinforcement = network_max_reinforcement(transmission=transmission, settings=settings)
+    transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
+    add_cap = add_cap_res_network(transmission, settings)
+
+    ## transmission lines
+    # pulled from SWITCH load_zones file
+    # need zone_dbid information to populate transmission_line column
+    def load_zones_table(IPM_regions, zone_ccs_distance_km):
+        load_zones = pd.DataFrame(columns=['LOAD_ZONE', 'zone_ccs_distance_km', 'zone_dbid'])
+        load_zones['LOAD_ZONE'] = IPM_regions
+        load_zones['zone_ccs_distance_km'] = 0 # set to default 0
+        load_zones['zone_dbid'] = range(1, len(IPM_regions)+1)
+        return load_zones
+
+    IPM_regions = settings.get('model_regions')
+    load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
+    zone_dict = dict(zip(load_zones['LOAD_ZONE'].to_list(), load_zones['zone_dbid'].to_list()))
+
+    tx_capex_mw_mile_dict = settings.get('transmission_investment_cost')['tx']['capex_mw_mile']
+    def region_avg(tx_capex_mw_mile_dict, region1, region2):
+        r1_value = tx_capex_mw_mile_dict[region1]
+        r2_value = tx_capex_mw_mile_dict[region2]
+        r_avg = mean([r1_value, r2_value])
+        return r_avg
+    def create_transm_line_col(lz1, lz2, zone_dict):
+        t_line = zone_dict[lz1]+'-'+zone_dict[lz2]
+        return t_line    
+
+
+    transmission_lines = transmission_lines_table(line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict)
+    transmission_lines
+
+
+    trans_capital_cost_per_mw_km = min(settings.get('transmission_investment_cost')['tx']['capex_mw_mile'].values()
+                                    ) * 1.60934
+    trans_params_table = pd.DataFrame({'trans_capital_cost_per_mw_km':trans_capital_cost_per_mw_km,
+                                    'trans_lifetime_yrs':20, 'trans_fixed_om_fraction':0.03},index=[0])
+    trans_params_table
+
+    transmission_lines.to_csv(out_folder /'transmission_lines.csv', index = False)
+    trans_params_table.to_csv(out_folder/'trans_params.csv', index = False)
+
+
+import ast
+import itertools
+from statistics import mode
+
+def balancing_tables(settings, pudl_engine, all_gen, out_folder):
+ 
+    IPM_regions = settings.get('model_regions')
+    bal_areas, zone_bal_areas = balancing_areas(pudl_engine, IPM_regions, all_gen, quickstart_res_load_frac=0.03, 
+                            quickstart_res_wind_frac=0.05, quickstart_res_solar_frac=0.05, 
+                            spinning_res_load_frac='.', spinning_res_wind_frac='.', spinning_res_solar_frac='.')
+
+
+    bal_areas
+
+    # adding in the dummy loadzone for the fuel_cost / regional_fuel_market issue
+    zone_bal_areas.loc[len(zone_bal_areas.index)] = ['loadzone', 'BANC']
+    zone_bal_areas
+
+    bal_areas.to_csv(out_folder /'balancing_areas.csv', index = False)
+    zone_bal_areas.to_csv(out_folder/'zone_balancing_areas.csv', index = False)
+
+
 
 
 def main(settings_file: str, results_folder: str):
@@ -524,8 +714,13 @@ def main(settings_file: str, results_folder: str):
     settings["input_folder"] = input_folder
     scenario_definitions = pd.read_csv(
         input_folder / settings["scenario_definitions_fn"]
-    )
+    )    
     scenario_settings = build_scenario_settings(settings, scenario_definitions)
+
+    # load hydro_variability_new, and need to add varibality for region 'MIS_D_MS'
+    # by copying values from ' MIS_AR'
+    hydro_variability_new = pd.read_csv(input_folder / settings["hydro_variability_fn"])
+    hydro_variability_new['MIS_D_MS'] = hydro_variability_new['MIS_AR']
 
     # Should switch the case_id/year layers in scenario settings dictionary.
     # Run through the different cases and save files in a new folder for each.
@@ -541,7 +736,7 @@ def main(settings_file: str, results_folder: str):
             settings_list.append(scenario_settings[year][case_id])
 
         gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
-        gen_prebuild_newbuild_info_files(gc, pudl_engine, settings_list, case_folder, pg_engine)
+        gen_prebuild_newbuild_info_files(gc, pudl_engine, settings_list, case_folder, pg_engine, hydro_variability_new)
         fuel_files(
             fuel_prices=gc.fuel_prices,
             planning_years=case_years,
@@ -550,6 +745,11 @@ def main(settings_file: str, results_folder: str):
             fuel_emission_factors=settings["fuel_emission_factors"],
             out_folder=case_folder,
         )
+        other_tables(atb_data_year= settings['atb_data_year'], out_folder=case_folder)
+
+        transmission_tables(settings, pg_engine, case_folder )
+
+        
 
 
 
