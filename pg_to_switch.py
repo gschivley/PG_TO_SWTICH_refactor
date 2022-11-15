@@ -234,9 +234,20 @@ def gen_projects_info_file(
         forced_outage_tech,
     )
 
+
+    graph_tech_colors_data = {'gen_type':['Biomass','Coal','Naturalgas','Geothermal','Hydro','Nuclear','Oil','Solar',
+                            'Storage','Waste','Wave','Wind','Other'],'color':['green','saddlebrown','gray',
+                            'red','royalblue','blueviolet','orange','gold','aquamarine','black','blue',
+                                                                              'deepskyblue','white']}
+    graph_tech_colors_table = pd.DataFrame(graph_tech_colors_data)
+    graph_tech_colors_table.insert(0,'map_name','default')
+    graph_tech_colors_table
+
+
+
     gen_type_tech = {'Onshore Wind Turbine':'Wind', 'Biomass': 'Biomass', 'Conventional Hydroelectric':'Hydro', 
-                'Conventional Steam Coal': 'Coal', 'Natural Gas Fired Combined Cycle':'Gas', 
-                 'Natural Gas Fired Combustion Turbine':'Gas', 'Natural Gas Steam Turbine':'Gas', 
+                'Conventional Steam Coal': 'Coal', 'Natural Gas Fired Combined Cycle':'Naturalgas', 
+                 'Natural Gas Fired Combustion Turbine':'Naturalgas', 'Natural Gas Steam Turbine':'Naturalgas', 
                 'Nuclear':'Nuclear', 'Solar Photovoltaic':'Solar', 'Hydroelectric Pumped Storage':'Hydro', 
                 'Offshore Wind Turbine':'Wind', 'NaturalGas_CCCCSAvgCF_Conservative':'Naturalgas', 
                 'NaturalGas_CCAvgCF_Moderate':'Naturalgas', 'NaturalGas_CTAvgCF_Moderate':'Naturalgas', 
@@ -255,13 +266,14 @@ def gen_projects_info_file(
     #     start_year=min(settings.get("data_years")),
     #     end_year=max(settings.get("data_years")),
     # )
-
     # gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])    
     # fuel_prices = gc.fuel_prices
     fuels = fuel_prices['fuel'].unique()
     fuels = [fuel.capitalize() for fuel in fuels]
     non_fuel_table = graph_tech_types_table[~graph_tech_types_table['energy_source'].isin(fuels)]
     non_fuel_energy = list(set(non_fuel_table['energy_source'].to_list()))
+    non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
+
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
 
@@ -270,6 +282,9 @@ def gen_projects_info_file(
 
 
     # Do I need to set full load heat rate to "." for non-fuel energy generators?
+    graph_tech_colors_table.to_csv(out_folder / "graph_tech_colors.csv", index=False)
+    graph_tech_types_table.to_csv(out_folder / "graph_tech_types.csv", index=False)
+    non_fuel_energy_table.to_csv(out_folder / "non_fuel_energy_sources.csv", index=False)
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
 
 
