@@ -902,6 +902,8 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         timeseries_list.append(df2)
     hydro_final_df = pd.concat(timeseries_list, axis=0)
 
+    hydro_final_df = hydro_final_df.drop(columns=['outage_rate', 'hydro_min_flow_mw_raw', 'hydro_avg_flow_mw_raw'])
+
     return hydro_final_df
 
 
@@ -1381,8 +1383,11 @@ def variable_capacity_factors_table(
 
     # reg_res_cl = all_gen["region_resource_cluster"].to_list()
     reg_res_cl = all_gen["index"].to_list()
-    reg_res_cl_copy =[str(i) for i in reg_res_cl]
-    reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
+    # reg_res_cl_copy =[str(i) for i in reg_res_cl]
+    # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
+
+    var_cap_fac["GENERATION_PROJECT"] = [int(i) for i in var_cap_fac["GENERATION_PROJECT"]]
+
 
     var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
 

@@ -303,6 +303,14 @@ all(isinstance(n, str) for n in reg_res_cl_copy)
 
 reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
 
+var_cap_fac["GENERATION_PROJECT"] = (
+    var_cap_fac["GENERATION_PROJECT"] + 1
+)
+
+var_cap_fac["GENERATION_PROJECT"] = [int(i) for i in var_cap_fac["GENERATION_PROJECT"]]
+
+all(isinstance(n, str) for n in var_cap_fac["GENERATION_PROJECT"])
+
 var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
 
 # var_cap_fac["GENERATION_PROJECT"] = var_cap_fac["GENERATION_PROJECT"].apply(
