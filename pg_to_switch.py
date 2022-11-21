@@ -1,6 +1,3 @@
-
-
-
 import os
 import sys
 import pandas as pd
@@ -34,6 +31,7 @@ from powergenome.external_data import (
     make_generator_variability,
 )
 from powergenome.GenX import add_misc_gen_values
+
 os.getcwd()
 
 from conversion_functions import (
@@ -61,9 +59,9 @@ from conversion_functions import (
 )
 
 from powergenome.load_profiles import (
-    make_load_curves, 
-    add_load_growth, 
-    make_final_load_curves, 
+    make_load_curves,
+    add_load_growth,
+    make_final_load_curves,
     make_distributed_gen_profiles,
 )
 
@@ -71,7 +69,6 @@ if not sys.warnoptions:
     import warnings
 
     warnings.simplefilter("ignore")
-
 
 
 def fuel_files(
@@ -102,34 +99,55 @@ def fuel_files(
     IPM_regions = regions
     load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
     # add in the dummy loadzone
-    load_zones.loc[len(load_zones.index)] = ['loadzone', 0, load_zones['zone_dbid'].max()+1]
+    load_zones.loc[len(load_zones.index)] = [
+        "loadzone",
+        0,
+        load_zones["zone_dbid"].max() + 1,
+    ]
     load_zones.to_csv(out_folder / "load_zones.csv", index=False)
 
-
-    regional_fuel_markets = pd.DataFrame({'regional_fuel_market':'loadzone-Fuel','fuel':'Fuel'}, index=[0])
+    regional_fuel_markets = pd.DataFrame(
+        {"regional_fuel_market": "loadzone-Fuel", "fuel": "Fuel"}, index=[0]
+    )
     regional_fuel_markets
 
     ### edited by RR. CHANGE COLUMN NAME from fuel to rfm.
-    zone_regional_fm = pd.DataFrame({'load_zone':'loadzone','rfm':'loadzone-Fuel'}, index=[0])
+    zone_regional_fm = pd.DataFrame(
+        {"load_zone": "loadzone", "rfm": "loadzone-Fuel"}, index=[0]
+    )
     zone_regional_fm
     # creating dummy values based on one load zone in REAM's input file
     # regional_fuel_market should align with the regional_fuel_market table
-    fuel_supply_curves20 = pd.DataFrame({'period':[2020,2020,2020,2020,2020,2020], 'tier':[1,2,3,4,5,6],
-                                        'unit_cost':[1.9, 4.0, 487.5, 563.7, 637.8, 816.7], 
-                                        'max_avail_at_cost':[651929, 3845638,3871799,3882177,3889953,3920836]})
-    fuel_supply_curves20.insert(0,'regional_fuel_market','loadzone-Fuel')
+    fuel_supply_curves20 = pd.DataFrame(
+        {
+            "period": [2020, 2020, 2020, 2020, 2020, 2020],
+            "tier": [1, 2, 3, 4, 5, 6],
+            "unit_cost": [1.9, 4.0, 487.5, 563.7, 637.8, 816.7],
+            "max_avail_at_cost": [651929, 3845638, 3871799, 3882177, 3889953, 3920836],
+        }
+    )
+    fuel_supply_curves20.insert(0, "regional_fuel_market", "loadzone-Fuel")
     fuel_supply_curves30 = fuel_supply_curves20.copy()
-    fuel_supply_curves30['period'] = 2030
+    fuel_supply_curves30["period"] = 2030
     fuel_supply_curves40 = fuel_supply_curves20.copy()
-    fuel_supply_curves40['period'] = 2040
+    fuel_supply_curves40["period"] = 2040
     fuel_supply_curves50 = fuel_supply_curves20.copy()
-    fuel_supply_curves50['period'] = 2050
-    fuel_supply_curves = pd.concat([fuel_supply_curves20, fuel_supply_curves30, fuel_supply_curves40,fuel_supply_curves50])
+    fuel_supply_curves50["period"] = 2050
+    fuel_supply_curves = pd.concat(
+        [
+            fuel_supply_curves20,
+            fuel_supply_curves30,
+            fuel_supply_curves40,
+            fuel_supply_curves50,
+        ]
+    )
     fuel_supply_curves
 
-    regional_fuel_markets.to_csv(out_folder / 'regional_fuel_markets.csv', index = False)
-    zone_regional_fm.to_csv(out_folder /'zone_to_regional_fuel_market.csv', index = False)
-    fuel_supply_curves.to_csv(out_folder /'fuel_supply_curves.csv', index = False)
+    regional_fuel_markets.to_csv(out_folder / "regional_fuel_markets.csv", index=False)
+    zone_regional_fm.to_csv(
+        out_folder / "zone_to_regional_fuel_market.csv", index=False
+    )
+    fuel_supply_curves.to_csv(out_folder / "fuel_supply_curves.csv", index=False)
 
     ###
 
@@ -143,7 +161,9 @@ def gen_projects_info_file(
     # pudl_engine: sa.engine,
     # settings_list: List[dict],
     # settings_file: str,
-    complete_gens: pd.DataFrame, settings: dict, out_folder: Path
+    complete_gens: pd.DataFrame,
+    settings: dict,
+    out_folder: Path,
 ):
 
     if settings.get("cogen_tech"):
@@ -273,31 +293,73 @@ def gen_projects_info_file(
         forced_outage_tech,
     )
 
-
-    graph_tech_colors_data = {'gen_type':['Biomass','Coal','Naturalgas','Geothermal','Hydro','Nuclear','Oil','Solar',
-                            'Storage','Waste','Wave','Wind','Other'],'color':['green','saddlebrown','gray',
-                            'red','royalblue','blueviolet','orange','gold','aquamarine','black','blue',
-                                                                              'deepskyblue','white']}
+    graph_tech_colors_data = {
+        "gen_type": [
+            "Biomass",
+            "Coal",
+            "Naturalgas",
+            "Geothermal",
+            "Hydro",
+            "Nuclear",
+            "Oil",
+            "Solar",
+            "Storage",
+            "Waste",
+            "Wave",
+            "Wind",
+            "Other",
+        ],
+        "color": [
+            "green",
+            "saddlebrown",
+            "gray",
+            "red",
+            "royalblue",
+            "blueviolet",
+            "orange",
+            "gold",
+            "aquamarine",
+            "black",
+            "blue",
+            "deepskyblue",
+            "white",
+        ],
+    }
     graph_tech_colors_table = pd.DataFrame(graph_tech_colors_data)
-    graph_tech_colors_table.insert(0,'map_name','default')
+    graph_tech_colors_table.insert(0, "map_name", "default")
     graph_tech_colors_table
 
+    gen_type_tech = {
+        "Onshore Wind Turbine": "Wind",
+        "Biomass": "Biomass",
+        "Conventional Hydroelectric": "Hydro",
+        "Conventional Steam Coal": "Coal",
+        "Natural Gas Fired Combined Cycle": "Naturalgas",
+        "Natural Gas Fired Combustion Turbine": "Naturalgas",
+        "Natural Gas Steam Turbine": "Naturalgas",
+        "Nuclear": "Nuclear",
+        "Solar Photovoltaic": "Solar",
+        "Hydroelectric Pumped Storage": "Hydro",
+        "Offshore Wind Turbine": "Wind",
+        "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
+        "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
+        "NaturalGas_CTAvgCF_Moderate": "Naturalgas",
+        "Battery_*_Moderate": "Storage",
+        "NaturalGas_CCS100_Moderate": "Naturalgas",
+    }
 
-
-    gen_type_tech = {'Onshore Wind Turbine':'Wind', 'Biomass': 'Biomass', 'Conventional Hydroelectric':'Hydro', 
-                'Conventional Steam Coal': 'Coal', 'Natural Gas Fired Combined Cycle':'Naturalgas', 
-                 'Natural Gas Fired Combustion Turbine':'Naturalgas', 'Natural Gas Steam Turbine':'Naturalgas', 
-                'Nuclear':'Nuclear', 'Solar Photovoltaic':'Solar', 'Hydroelectric Pumped Storage':'Hydro', 
-                'Offshore Wind Turbine':'Wind', 'NaturalGas_CCCCSAvgCF_Conservative':'Naturalgas', 
-                'NaturalGas_CCAvgCF_Moderate':'Naturalgas', 'NaturalGas_CTAvgCF_Moderate':'Naturalgas', 
-                 'Battery_*_Moderate':'Storage', 'NaturalGas_CCS100_Moderate':'Naturalgas'}
-
-    gen_tech = gen_project_info['gen_tech'].unique()
-    graph_tech_types_table = pd.DataFrame(columns=['map_name', 'gen_type', 'gen_tech', 'energy_source'])
-    graph_tech_types_table['gen_tech'] = gen_tech
-    graph_tech_types_table['energy_source'] = graph_tech_types_table['gen_tech'].apply(lambda x: energy_tech[x])
-    graph_tech_types_table['map_name'] = 'default'
-    graph_tech_types_table['gen_type'] = graph_tech_types_table['gen_tech'].apply(lambda x: gen_type_tech[x])
+    gen_tech = gen_project_info["gen_tech"].unique()
+    graph_tech_types_table = pd.DataFrame(
+        columns=["map_name", "gen_type", "gen_tech", "energy_source"]
+    )
+    graph_tech_types_table["gen_tech"] = gen_tech
+    graph_tech_types_table["energy_source"] = graph_tech_types_table["gen_tech"].apply(
+        lambda x: energy_tech[x]
+    )
+    graph_tech_types_table["map_name"] = "default"
+    graph_tech_types_table["gen_type"] = graph_tech_types_table["gen_tech"].apply(
+        lambda x: gen_type_tech[x]
+    )
 
     # settings = load_settings(path=settings_file)
     # pudl_engine, pudl_out, pg_engine = init_pudl_connection(
@@ -305,25 +367,31 @@ def gen_projects_info_file(
     #     start_year=min(settings.get("data_years")),
     #     end_year=max(settings.get("data_years")),
     # )
-    # gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])    
+    # gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
     # fuel_prices = gc.fuel_prices
-    fuels = fuel_prices['fuel'].unique()
+    fuels = fuel_prices["fuel"].unique()
     fuels = [fuel.capitalize() for fuel in fuels]
-    non_fuel_table = graph_tech_types_table[~graph_tech_types_table['energy_source'].isin(fuels)]
-    non_fuel_energy = list(set(non_fuel_table['energy_source'].to_list()))
-    non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
+    non_fuel_table = graph_tech_types_table[
+        ~graph_tech_types_table["energy_source"].isin(fuels)
+    ]
+    non_fuel_energy = list(set(non_fuel_table["energy_source"].to_list()))
+    non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=["energy_source"])
 
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
-
-    gen_project_info['gen_full_load_heat_rate'] = gen_project_info.apply(
-                lambda row: '.' if row.gen_energy_source in non_fuel_energy else row.gen_full_load_heat_rate,  axis=1)
-
+    gen_project_info["gen_full_load_heat_rate"] = gen_project_info.apply(
+        lambda row: "."
+        if row.gen_energy_source in non_fuel_energy
+        else row.gen_full_load_heat_rate,
+        axis=1,
+    )
 
     # Do I need to set full load heat rate to "." for non-fuel energy generators?
     graph_tech_colors_table.to_csv(out_folder / "graph_tech_colors.csv", index=False)
     graph_tech_types_table.to_csv(out_folder / "graph_tech_types.csv", index=False)
-    non_fuel_energy_table.to_csv(out_folder / "non_fuel_energy_sources.csv", index=False)
+    non_fuel_energy_table.to_csv(
+        out_folder / "non_fuel_energy_sources.csv", index=False
+    )
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
 
 
@@ -333,7 +401,7 @@ def gen_prebuild_newbuild_info_files(
     settings_list: List[dict],
     out_folder: Path,
     pg_engine: sa.engine,
-    hydro_variability_new: pd.DataFrame 
+    hydro_variability_new: pd.DataFrame,
 ):
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
@@ -342,7 +410,6 @@ def gen_prebuild_newbuild_info_files(
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
     ]  # gc.create_region_technology_clusters()
-
 
     data_years = gc.settings.get("data_years", [])
     if not isinstance(data_years, list):
@@ -431,7 +498,7 @@ def gen_prebuild_newbuild_info_files(
         [
             "plant_id_eia",
             "generator_id",
-            "unit_id_pudl",
+            "unit_id_pg",
             "planned_operating_year",
             "planned_retirement_date",
             "operating_date",
@@ -504,45 +571,64 @@ def gen_prebuild_newbuild_info_files(
         subset=["Resource"]
     )
     complete_gens = add_misc_gen_values(complete_gens, gc.settings)
-    gen_projects_info_file(gc.fuel_prices,complete_gens, gc.settings, out_folder)
+    gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
-    timeseries_df = timeseries(load_curves, max_weight=20.2778, avg_weight=283.8889, ts_duration_of_tp=4, 
-                          ts_num_tps=6)
-    timeseries_dates = timeseries_df['timeseries'].to_list()
-    timestamp_interval = ['00', '04', '08', '12','16', '20'] # should align with ts_duration_of_tp and ts_num_tps
+    timeseries_df = timeseries(
+        load_curves,
+        max_weight=20.2778,
+        avg_weight=283.8889,
+        ts_duration_of_tp=4,
+        ts_num_tps=6,
+    )
+    timeseries_dates = timeseries_df["timeseries"].to_list()
+    timestamp_interval = [
+        "00",
+        "04",
+        "08",
+        "12",
+        "16",
+        "20",
+    ]  # should align with ts_duration_of_tp and ts_num_tps
     timepoints_df = timepoints_table(timeseries_dates, timestamp_interval)
     # create lists and dictionary for later use
-    timepoints_timestamp = timepoints_df['timestamp'].to_list() # timestamp list
-    timepoints_tp_id = timepoints_df['timepoint_id'].to_list() # timepoint_id list
-    timepoints_dict = dict(zip(timepoints_timestamp, timepoints_tp_id)) # {timestamp: timepoint_id}
+    timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
+    timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
+    timepoints_dict = dict(
+        zip(timepoints_timestamp, timepoints_tp_id)
+    )  # {timestamp: timepoint_id}
     hydro_timepoints_df = hydro_timepoints_table(timepoints_df)
     hydro_timepoints_df
 
     graph_timestamp_map = graph_timestamp_map_table(timeseries_df, timestamp_interval)
     graph_timestamp_map
-    timeseries_df.to_csv(out_folder / 'timeseries.csv', index = False)
-    timepoints_df.to_csv(out_folder / 'timepoints.csv', index = False)
-    hydro_timepoints_df.to_csv(out_folder / 'hydro_timepoints.csv', index = False)
-    graph_timestamp_map.to_csv(out_folder / 'graph_timestamp_map.csv', index = False)
+    timeseries_df.to_csv(out_folder / "timeseries.csv", index=False)
+    timepoints_df.to_csv(out_folder / "timepoints.csv", index=False)
+    hydro_timepoints_df.to_csv(out_folder / "hydro_timepoints.csv", index=False)
+    graph_timestamp_map.to_csv(out_folder / "graph_timestamp_map.csv", index=False)
 
-
-    period_list = ['2020', '2030', '2040','2050']
-    loads, loads_with_year_hour = loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
+    period_list = ["2020", "2030", "2040", "2050"]
+    loads, loads_with_year_hour = loads_table(
+        load_curves, timepoints_timestamp, timepoints_dict, period_list
+    )
     # for fuel_cost and regional_fuel_market issue
-    dummy_df = pd.DataFrame({'TIMEPOINT':timepoints_tp_id})
-    dummy_df.insert(0,'LOAD_ZONE','loadzone')
-    dummy_df.insert(2,'zone_demand_mw',0)
+    dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
+    dummy_df.insert(0, "LOAD_ZONE", "loadzone")
+    dummy_df.insert(2, "zone_demand_mw", 0)
     loads = loads.append(dummy_df)
 
-    year_hour = loads_with_year_hour['year_hour'].to_list()
+    year_hour = loads_with_year_hour["year_hour"].to_list()
     all_gen_variability = make_generator_variability(all_gen)
-    vcf = variable_capacity_factors_table(all_gen_variability, year_hour, timepoints_dict, all_gen)
-    
+    vcf = variable_capacity_factors_table(
+        all_gen_variability, year_hour, timepoints_dict, all_gen
+    )
+
     balancing_tables(settings, pudl_engine, all_gen, out_folder)
-    hydro_timeseries_table = hydro_timeseries(existing_gen, hydro_variability_new, period_list)
-    hydro_timeseries_table.to_csv(out_folder / 'hydro_timeseries.csv', index=False)
+    hydro_timeseries_table = hydro_timeseries(
+        existing_gen, hydro_variability_new, period_list
+    )
+    hydro_timeseries_table.to_csv(out_folder / "hydro_timeseries.csv", index=False)
 
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
@@ -551,62 +637,67 @@ def gen_prebuild_newbuild_info_files(
     gen_buildpre.to_csv(out_folder / "gen_build_predetermined.csv", index=False)
     gen_build_costs.to_csv(out_folder / "gen_build_costs.csv", index=False)
 
+
 ### edit by RR
 
 
 def other_tables(atb_data_year, out_folder):
 
     # Based on REAM
-    carbon_policies_data = {'period':[2020, 2030, 2040, 2050], 'carbon_cap_tco2_per_yr':[222591761.6,
-                        149423302.5, 76328672.3, 0], 'carbon_cap_tco2_per_yr_CA':[57699000, 36292500, 11400000, 0],
-                       'carbon_cost_dollar_per_tco2':['.','.','.','.']}
+    carbon_policies_data = {
+        "period": [2020, 2030, 2040, 2050],
+        "carbon_cap_tco2_per_yr": [222591761.6, 149423302.5, 76328672.3, 0],
+        "carbon_cap_tco2_per_yr_CA": [57699000, 36292500, 11400000, 0],
+        "carbon_cost_dollar_per_tco2": [".", ".", ".", "."],
+    }
     carbon_policies_table = pd.DataFrame(carbon_policies_data)
     carbon_policies_table
 
     # interest and discount based on REAM
-    financials_data = {'base_financial_year':atb_data_year, 'interest_rate': 0.05, 'discount_rate':0.05}
+    financials_data = {
+        "base_financial_year": atb_data_year,
+        "interest_rate": 0.05,
+        "discount_rate": 0.05,
+    }
     financials_table = pd.DataFrame(financials_data, index=[0])
     financials_table
 
     # based on REAM
-    periods_data = {'INVESTMENT_PERIOD':[2020,2030,2040,2050], 'period_start':[2016,2026,2036,2046],
-               'period_end':[2025,2035,2045,2055]}
+    periods_data = {
+        "INVESTMENT_PERIOD": [2020, 2030, 2040, 2050],
+        "period_start": [2016, 2026, 2036, 2046],
+        "period_end": [2025, 2035, 2045, 2055],
+    }
     periods_table = pd.DataFrame(periods_data)
     periods_table
 
-    carbon_policies_table.to_csv(out_folder / 'carbon_policies.csv', index = False)
-    financials_table.to_csv(out_folder / 'financials.csv', index = False)
-    periods_table.to_csv(out_folder / 'periods.csv', index = False)
-
+    carbon_policies_table.to_csv(out_folder / "carbon_policies.csv", index=False)
+    financials_table.to_csv(out_folder / "financials.csv", index=False)
+    periods_table.to_csv(out_folder / "periods.csv", index=False)
 
 
 from powergenome.generators import load_ipm_shapefile
 from powergenome.GenX import (
-        network_line_loss,
-        network_max_reinforcement,
-        network_reinforcement_cost,
-        add_cap_res_network
+    network_line_loss,
+    network_max_reinforcement,
+    network_reinforcement_cost,
+    add_cap_res_network,
 )
 from powergenome.transmission import (
-        agg_transmission_constraints,
-        transmission_line_distance,
+    agg_transmission_constraints,
+    transmission_line_distance,
 )
-from powergenome.util import (
-        init_pudl_connection, 
-        load_settings,
-        check_settings
-)
+from powergenome.util import init_pudl_connection, load_settings, check_settings
 from statistics import mean
 
-def transmission_tables(settings, 
-    out_folder,
-    pg_engine):
-    
-    '''
+
+def transmission_tables(settings, out_folder, pg_engine):
+
+    """
     pulling in information from PowerGenome transmission notebook
-    Schivley Greg, PowerGenome, (2022), GitHub repository, 
+    Schivley Greg, PowerGenome, (2022), GitHub repository,
         https://github.com/PowerGenome/PowerGenome/blob/master/notebooks/Transmission.ipynb
-    '''
+    """
     IPM_regions = settings["model_regions"]
 
     transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
@@ -619,8 +710,12 @@ def transmission_tables(settings,
     )
 
     line_loss = network_line_loss(transmission=transmission, settings=settings)
-    network_reinforcement_cost = network_reinforcement_cost(transmission=transmission, settings=settings)
-    network_max_reinforcement = network_max_reinforcement(transmission=transmission, settings=settings)
+    network_reinforcement_cost_df = network_reinforcement_cost(
+        transmission=transmission, settings=settings
+    )
+    network_max_reinforcement_df = network_max_reinforcement(
+        transmission=transmission, settings=settings
+    )
     transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
     add_cap = add_cap_res_network(transmission, settings)
 
@@ -628,63 +723,87 @@ def transmission_tables(settings,
     # pulled from SWITCH load_zones file
     # need zone_dbid information to populate transmission_line column
     def load_zones_table(IPM_regions, zone_ccs_distance_km):
-        load_zones = pd.DataFrame(columns=['LOAD_ZONE', 'zone_ccs_distance_km', 'zone_dbid'])
-        load_zones['LOAD_ZONE'] = IPM_regions
-        load_zones['zone_ccs_distance_km'] = 0 # set to default 0
-        load_zones['zone_dbid'] = range(1, len(IPM_regions)+1)
+        load_zones = pd.DataFrame(
+            columns=["LOAD_ZONE", "zone_ccs_distance_km", "zone_dbid"]
+        )
+        load_zones["LOAD_ZONE"] = IPM_regions
+        load_zones["zone_ccs_distance_km"] = 0  # set to default 0
+        load_zones["zone_dbid"] = range(1, len(IPM_regions) + 1)
         return load_zones
 
-    IPM_regions = settings.get('model_regions')
+    IPM_regions = settings.get("model_regions")
     load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
-    zone_dict = dict(zip(load_zones['LOAD_ZONE'].to_list(), load_zones['zone_dbid'].to_list()))
+    zone_dict = dict(
+        zip(load_zones["LOAD_ZONE"].to_list(), load_zones["zone_dbid"].to_list())
+    )
 
-    tx_capex_mw_mile_dict = settings.get('transmission_investment_cost')['tx']['capex_mw_mile']
+    tx_capex_mw_mile_dict = settings.get("transmission_investment_cost")["tx"][
+        "capex_mw_mile"
+    ]
+
     def region_avg(tx_capex_mw_mile_dict, region1, region2):
         r1_value = tx_capex_mw_mile_dict[region1]
         r2_value = tx_capex_mw_mile_dict[region2]
         r_avg = mean([r1_value, r2_value])
         return r_avg
+
     def create_transm_line_col(lz1, lz2, zone_dict):
-        t_line = zone_dict[lz1]+'-'+zone_dict[lz2]
-        return t_line    
+        t_line = zone_dict[lz1] + "-" + zone_dict[lz2]
+        return t_line
 
-
-    transmission_lines = transmission_lines_table(line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict)
+    transmission_lines = transmission_lines_table(
+        line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict
+    )
     transmission_lines
 
-
-    trans_capital_cost_per_mw_km = min(settings.get('transmission_investment_cost')['tx']['capex_mw_mile'].values()
-                                    ) * 1.60934
-    trans_params_table = pd.DataFrame({'trans_capital_cost_per_mw_km':trans_capital_cost_per_mw_km,
-                                    'trans_lifetime_yrs':20, 'trans_fixed_om_fraction':0.03},index=[0])
+    trans_capital_cost_per_mw_km = (
+        min(
+            settings.get("transmission_investment_cost")["tx"]["capex_mw_mile"].values()
+        )
+        * 1.60934
+    )
+    trans_params_table = pd.DataFrame(
+        {
+            "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,
+            "trans_lifetime_yrs": 20,
+            "trans_fixed_om_fraction": 0.03,
+        },
+        index=[0],
+    )
     trans_params_table
 
-    transmission_lines.to_csv(out_folder /'transmission_lines.csv', index = False)
-    trans_params_table.to_csv(out_folder/'trans_params.csv', index = False)
+    transmission_lines.to_csv(out_folder / "transmission_lines.csv", index=False)
+    trans_params_table.to_csv(out_folder / "trans_params.csv", index=False)
 
 
 import ast
 import itertools
 from statistics import mode
 
-def balancing_tables(settings, pudl_engine, all_gen, out_folder):
- 
-    IPM_regions = settings.get('model_regions')
-    bal_areas, zone_bal_areas = balancing_areas(pudl_engine, IPM_regions, all_gen, quickstart_res_load_frac=0.03, 
-                            quickstart_res_wind_frac=0.05, quickstart_res_solar_frac=0.05, 
-                            spinning_res_load_frac='.', spinning_res_wind_frac='.', spinning_res_solar_frac='.')
 
+def balancing_tables(settings, pudl_engine, all_gen, out_folder):
+
+    IPM_regions = settings.get("model_regions")
+    bal_areas, zone_bal_areas = balancing_areas(
+        pudl_engine,
+        IPM_regions,
+        all_gen,
+        quickstart_res_load_frac=0.03,
+        quickstart_res_wind_frac=0.05,
+        quickstart_res_solar_frac=0.05,
+        spinning_res_load_frac=".",
+        spinning_res_wind_frac=".",
+        spinning_res_solar_frac=".",
+    )
 
     bal_areas
 
     # adding in the dummy loadzone for the fuel_cost / regional_fuel_market issue
-    zone_bal_areas.loc[len(zone_bal_areas.index)] = ['loadzone', 'BANC']
+    zone_bal_areas.loc[len(zone_bal_areas.index)] = ["loadzone", "BANC"]
     zone_bal_areas
 
-    bal_areas.to_csv(out_folder /'balancing_areas.csv', index = False)
-    zone_bal_areas.to_csv(out_folder/'zone_balancing_areas.csv', index = False)
-
-
+    bal_areas.to_csv(out_folder / "balancing_areas.csv", index=False)
+    zone_bal_areas.to_csv(out_folder / "zone_balancing_areas.csv", index=False)
 
 
 def main(settings_file: str, results_folder: str):
@@ -707,20 +826,20 @@ def main(settings_file: str, results_folder: str):
     pudl_engine, pudl_out, pg_engine = init_pudl_connection(
         freq="AS",
         start_year=min(settings.get("data_years")),
-        end_year=max(settings.get("data_years"))
+        end_year=max(settings.get("data_years")),
     )
     check_settings(settings, pg_engine)
     input_folder = cwd / settings["input_folder"]
     settings["input_folder"] = input_folder
     scenario_definitions = pd.read_csv(
         input_folder / settings["scenario_definitions_fn"]
-    )    
+    )
     scenario_settings = build_scenario_settings(settings, scenario_definitions)
 
     # load hydro_variability_new, and need to add varibality for region 'MIS_D_MS'
     # by copying values from ' MIS_AR'
     hydro_variability_new = pd.read_csv(input_folder / settings["hydro_variability_fn"])
-    hydro_variability_new['MIS_D_MS'] = hydro_variability_new['MIS_AR']
+    hydro_variability_new["MIS_D_MS"] = hydro_variability_new["MIS_AR"]
 
     # Should switch the case_id/year layers in scenario settings dictionary.
     # Run through the different cases and save files in a new folder for each.
@@ -736,7 +855,14 @@ def main(settings_file: str, results_folder: str):
             settings_list.append(scenario_settings[year][case_id])
 
         gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
-        gen_prebuild_newbuild_info_files(gc, pudl_engine, settings_list, case_folder, pg_engine, hydro_variability_new)
+        gen_prebuild_newbuild_info_files(
+            gc,
+            pudl_engine,
+            settings_list,
+            case_folder,
+            pg_engine,
+            hydro_variability_new,
+        )
         fuel_files(
             fuel_prices=gc.fuel_prices,
             planning_years=case_years,
@@ -745,13 +871,9 @@ def main(settings_file: str, results_folder: str):
             fuel_emission_factors=settings["fuel_emission_factors"],
             out_folder=case_folder,
         )
-        other_tables(atb_data_year= settings['atb_data_year'], out_folder=case_folder)
+        other_tables(atb_data_year=settings["atb_data_year"], out_folder=case_folder)
 
-        transmission_tables(settings, pg_engine, case_folder )
-
-        
-
-
+        transmission_tables(settings, case_folder, pg_engine)
 
 
 if __name__ == "__main__":
