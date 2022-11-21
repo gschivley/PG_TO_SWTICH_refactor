@@ -29,7 +29,7 @@ capacity_limit_spur_fn: resource_capacity_spur_east.csv # Max capacity and spur 
 
 # distributed_gen_profiles_fn: test_dg_profiles.csv # Hourly profiles of distributed gen by region
 emission_policies_fn: emission_policies.csv # Emission policies for each model_year/region/case_id
-misc_gen_inputs_fn: misc_gen_inputs.csv # Taylor - from Greg: any addtl resource attributes not in PowerGenome go here
+misc_gen_inputs_fn: misc_gen_inputs.csv ## it was 'misc_gen_inputs.csv' # Taylor - from Greg: any addtl resource attributes not in PowerGenome go here
 # region_wind_pv_cap_fn: existing_wind_pv_capacity.csv # Only use if your data is more up-to-date than PUDL
 
 genx_settings_folder: genx_settings_full # In the same folder as this file, not in "input_folder" subfolder
@@ -80,7 +80,7 @@ avg_distribution_loss: 0.0453
 
 # Name of the DSM resource, fraction of load that can be shifted, and number of hours
 # that it can be shifted
-demand_response_resources:
+flexible_demand_resources:
   2020:
     heat_load_shifting:
       fraction_shiftable: 0.35
@@ -472,6 +472,7 @@ num_clusters:
   Solar Photovoltaic: ~
   Onshore Wind Turbine: ~
   Offshore Wind Turbine: ~
+  Landbased Wind Turbine: ~ # add by RR
   # Solar Thermal with Energy Storage: 1
   # Solar Thermal without Energy Storage: 1
   Small Hydroelectric: ~
@@ -949,7 +950,7 @@ atb_new_gen:
   - [NaturalGas, CTAvgCF, Moderate, 100] # TAYLOR - Mid VS Moderate
   - [LandbasedWind, Class1, Moderate, 1] # TAYLOR - tech detail was LTRG4, based on Wiki updated to Class1. Mid VS Moderate
   - [OffShoreWind, Class1, Moderate, 1] # TAYLOR - tech detail was OTRG3, based on Wiki updated to Class1. Mid VS Moderate
-  # - [OffShoreWind, Class3, Moderate, 1] # Rangrang - from slack with Greg
+  #- [OffShoreWind, Class3, Moderate, 1] # Rangrang - from slack with Greg
   - [UtilityPV, Class1, Moderate, 1] # TAYLOR - Mid VS Moderate. Class1 vs KansasCity
   - [Battery, "*", Moderate, 1] # TAYLOR - Mid VS Moderate
   # - [Nuclear, Nuclear, Moderate, 500]
@@ -983,41 +984,63 @@ pv_ac_dc_ratio: 1.3
 
 # TAYLOR - not clustering - ignoring, but seem to need region/tech/max/min in order to run nrelatb
 renewables_clusters:
-  - region: ~
-    technology: ~
-    max_clusters: ~
-    max_lcoe: ~
-    min_capacity: ~
-  # - region: NENGREST
-  #   technology: offshorewind
-  #   turbine_type: fixed
-  #   pref_site: 1
-  #   max_clusters: 1
-  #   min_capacity: 10000
-  # - region: NENGREST
-  #   technology: utilitypv
-  #   max_clusters: 1
-  #   max_lcoe: 100
-  #   min_capacity: 21000
-  #   cap_multiplier: 0.2
-  # - region: NENG_CT
-  #   technology: landbasedwind
-  #   max_clusters: 1
-  #   min_capacity: 2000
-  # - region: NENG_CT
-  #   technology: utilitypv
-  #   max_clusters: 1
-  #   min_capacity: 17100
-  #   cap_multiplier: 0.2
-  # - region: NENG_ME
-  #   technology: landbasedwind
-  #   max_clusters: 1
-  #   min_capacity: 20500
-  # - region: NENG_ME
-  #   technology: utilitypv
-  #   max_clusters: 1
-  #   min_capacity: 21600
-  #   cap_multiplier: 0.2
+  - region: CA_N
+    technology: landbasedwind
+    max_clusters: 2
+    max_lcoe: 110
+    min_capacity: 25000
+  - region: CA_N
+    technology: offshorewind
+    turbine_type: floating
+    pref_site: 1
+    max_clusters: 3
+    min_capacity: 40000
+  - region: CA_S
+    technology: landbasedwind
+    max_clusters: 4
+    max_lcoe: 100
+    min_capacity: 45000
+  - region: CA_S
+    technology: utilitypv
+    max_clusters: 5
+    max_lcoe: 75
+    min_capacity: 100000
+    # cap_multiplier: 0.2
+  - region: WECC_AZ
+    technology: utilitypv
+    max_clusters: 3
+    min_capacity: 100000
+    # cap_multiplier: 0.2  
+  - region: NENGREST
+    technology: offshorewind
+    turbine_type: fixed
+    pref_site: 1
+    max_clusters: 1
+    min_capacity: 10000
+  - region: NENGREST
+    technology: utilitypv
+    max_clusters: 1
+    max_lcoe: 100
+    min_capacity: 21000
+    #cap_multiplier: 0.2
+  - region: NENG_CT
+    technology: landbasedwind
+    max_clusters: 1
+    min_capacity: 2000
+  - region: NENG_CT
+    technology: utilitypv
+    max_clusters: 1
+    min_capacity: 17100
+    #cap_multiplier: 0.2
+  - region: NENG_ME
+    technology: landbasedwind
+    max_clusters: 1
+    min_capacity: 20500
+  - region: NENG_ME
+    technology: utilitypv
+    max_clusters: 1
+    min_capacity: 21600
+    #cap_multiplier: 0.2
 
 # Fuel consumption for start-up events (mmbtu/MW) from Lew et al 2013,
 # Finding Flexibility: Cycling the Conventional Fleet
@@ -1155,7 +1178,7 @@ default_load_year: 2012
 regular_load_growth_start_year: 2019
 growth_scenario: REF2020
 
-historical_load_region_maps:
+historical_load_region_map:
   TRE: [ERC_PHDL, ERC_REST, ERC_WEST]
   FLRC: [FRCC] #FRCC
   MWRCE: [MIS_WUMS]
