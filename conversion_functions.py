@@ -123,13 +123,13 @@ def plant_pudl_id(df):
     has_plant_id = df.loc[df["plant_id_eia"].notna(), :]
     no_plant_id = df.loc[df["plant_id_eia"].isna(), :]
     plant_id_eia = has_plant_id["plant_id_eia"]
-    unit_id_pudl = has_plant_id["unit_id_pudl"].astype(str)
-    has_plant_id.loc[~unit_id_pudl.str.contains("_"), "plant_pudl_id"] = (
-        plant_id_eia.astype(str) + "_" + unit_id_pudl
+    unit_id_pg = has_plant_id["unit_id_pg"].astype(str)
+    has_plant_id.loc[~unit_id_pg.str.contains("_"), "plant_pudl_id"] = (
+        plant_id_eia.astype(str) + "_" + unit_id_pg
     )
     has_plant_id.loc[
         has_plant_id["plant_pudl_id"].isna(), "plant_pudl_id"
-    ] = has_plant_id.loc[has_plant_id["plant_pudl_id"].isna(), "unit_id_pudl"]
+    ] = has_plant_id.loc[has_plant_id["plant_pudl_id"].isna(), "unit_id_pg"]
 
     return pd.concat([has_plant_id, no_plant_id], ignore_index=True)
 
