@@ -589,6 +589,10 @@ retirement_ages: # TAYLOR - https://www.nrel.gov/docs/fy22osti/80641.pdf (pdf pa
   Battery_*_Moderate: 15
   NaturalGas_CCS100_Moderate: 60
   heat_load_shifting: 10 # deleting
+  UtilityPV_Class1_Moderate_100: 30
+  UtilityPV_Class1_Moderate: 30
+  LandbasedWind_Class1_Moderate: 30
+  OffShoreWind_Class1_Moderate: 30
   ####
 
 
