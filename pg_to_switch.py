@@ -292,11 +292,6 @@ def gen_projects_info_file(
         complete_gens,
         settings.get("transmission_investment_cost")["spur"]["capex_mw_mile"],
         settings.get("retirement_ages"),
-        cogen_tech,
-        baseload_tech,
-        energy_tech,
-        sched_outage_tech,
-        forced_outage_tech,
     )
 
     graph_tech_colors_data = {
@@ -355,18 +350,14 @@ def gen_projects_info_file(
         "NaturalGas_CCS100_Moderate": "Naturalgas",
     }
 
-    gen_tech = gen_project_info["gen_tech"].unique()
-    graph_tech_types_table = pd.DataFrame(
-        columns=["map_name", "gen_type", "gen_tech", "energy_source"]
-    )
-    graph_tech_types_table["gen_tech"] = gen_tech
-    graph_tech_types_table["energy_source"] = graph_tech_types_table["gen_tech"].apply(
-        lambda x: energy_tech[x]
-    )
+    graph_tech_types_table = gen_project_info.drop_duplicates(subset="gen_tech")
     graph_tech_types_table["map_name"] = "default"
-    graph_tech_types_table["gen_type"] = graph_tech_types_table["gen_tech"].apply(
-        lambda x: gen_type_tech[x]
-    )
+    graph_tech_types_table["energy_source"] = graph_tech_types_table[
+        "gen_energy_source"
+    ]
+
+    cols = ["map_name", "gen_type", "gen_tech", "energy_source"]
+    graph_tech_types_table = graph_tech_types_table[cols]
 
     # settings = load_settings(path=settings_file)
     # pudl_engine, pudl_out, pg_engine = init_pudl_connection(

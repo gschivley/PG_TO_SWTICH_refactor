@@ -538,11 +538,6 @@ def generation_projects_info(
     all_gen,
     spur_capex_mw_mile,
     retirement_age,
-    cogen_tech,
-    baseload_tech,
-    energy_tech,
-    sched_outage_tech,
-    forced_outage_tech,
 ):
     """
     Create the generation_projects_info table based on REAM scenario 178.
@@ -596,6 +591,12 @@ def generation_projects_info(
             "Eff_Down",
             "VRE",
             "Max_Cap_MW",
+            "gen_energy_source",
+            "gen_is_cogen",
+            "gen_is_baseload",
+            "gen_scheduled_outage_rate",
+            "gen_forced_outage_rate",
+            "gen_type",
         ]
     ]
 
@@ -648,23 +649,6 @@ def generation_projects_info(
     gen_project_info["gen_store_to_release_ratio"] = gen_project_info[
         "gen_store_to_release_ratio"
     ].fillna(".")
-
-    # based on manually created dictionaries
-    gen_project_info["gen_energy_source"] = gen_project_info["technology"].apply(
-        lambda x: energy_tech[x]
-    )
-    gen_project_info["gen_is_cogen"] = gen_project_info["technology"].apply(
-        lambda x: cogen_tech[x]
-    )
-    gen_project_info["gen_is_baseload"] = gen_project_info["technology"].apply(
-        lambda x: baseload_tech[x]
-    )
-    gen_project_info["gen_scheduled_outage_rate"] = gen_project_info[
-        "technology"
-    ].apply(lambda x: sched_outage_tech[x])
-    gen_project_info["gen_forced_outage_rate"] = gen_project_info["technology"].apply(
-        lambda x: forced_outage_tech[x]
-    )
 
     # additional columns based on REAM
     gen_project_info["gen_min_build_capacity"] = 0  # REAM is just 0 or .
@@ -742,6 +726,7 @@ def generation_projects_info(
         "gen_discharge_efficiency",
         "gen_land_use_rate",
         "gen_storage_energy_to_power_ratio",
+        "gen_type",
     ]  # index
 
     # remove NaN
