@@ -413,6 +413,7 @@ def gen_prebuild_newbuild_info_files(
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
     all_gen = gc.create_all_generators()
+    all_gen = add_misc_gen_values(all_gen, settings)
     all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
     all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
@@ -581,7 +582,6 @@ def gen_prebuild_newbuild_info_files(
     complete_gens = pd.concat([existing_gen, newgens]).drop_duplicates(
         subset=["Resource"]
     )
-    complete_gens = add_misc_gen_values(complete_gens, gc.settings)
     gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
 
     ### edit by RR
