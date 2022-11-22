@@ -413,6 +413,8 @@ def gen_prebuild_newbuild_info_files(
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
     all_gen = gc.create_all_generators()
+    all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
+    all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
@@ -549,6 +551,8 @@ def gen_prebuild_newbuild_info_files(
     for settings in settings_list:
         gc.settings = settings
         new_gen = gc.create_new_generators()
+        new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
+        new_gen["technology"] = new_gen["technology"].str.rstrip("_")
         new_gen["build_year"] = settings["model_year"]
         df_list.append(new_gen)
 
