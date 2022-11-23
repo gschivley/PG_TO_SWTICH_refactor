@@ -181,6 +181,7 @@ def gen_projects_info_file(
             "Solar Photovoltaic": False,
             "Hydroelectric Pumped Storage": False,
             "Offshore Wind Turbine": False,
+            "OffShoreWind_Class1_Moderate_fixed_1": False,
             "Landbased Wind Turbine": False,
             "Small Hydroelectric": False,
             "NaturalGas_CCCCSAvgCF_Conservative": False,
@@ -189,6 +190,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
+            "UtilityPV_Class1_Moderate_100": False,
         }
     if settings.get("baseload_tech"):
         baseload_tech = settings.get("baseload_tech")
@@ -205,6 +208,7 @@ def gen_projects_info_file(
             "Solar Photovoltaic": False,
             "Hydroelectric Pumped Storage": False,
             "Offshore Wind Turbine": False,
+            "OffShoreWind_Class1_Moderate_fixed_1": False,
             "Landbased Wind Turbine": False,
             "Small Hydroelectric": False,
             "NaturalGas_CCCCSAvgCF_Conservative": False,
@@ -213,6 +217,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
+            "UtilityPV_Class1_Moderate_100": False,
         }
     if settings.get("energy_tech"):
         energy_tech = settings["energy_tech"]
@@ -229,6 +235,7 @@ def gen_projects_info_file(
             "Solar Photovoltaic": "Solar",
             "Hydroelectric Pumped Storage": "Water",
             "Offshore Wind Turbine": "Wind",
+            "OffShoreWind_Class1_Moderate_fixed_1": "Wind",
             "Landbased Wind Turbine": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
             "LandbasedWind_Class1_Moderate": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
             "Small Hydroelectric": "Water",
@@ -238,6 +245,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": "Electricity",
             "NaturalGas_CCS100_Moderate": "Naturalgas",
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": "Solar",
+            "UtilityPV_Class1_Moderate_100": "Solar",
         }
     if settings.get("forced_outage_tech"):
         forced_outage_tech = settings["forced_outage_tech"]
@@ -254,6 +263,7 @@ def gen_projects_info_file(
             "Solar Photovoltaic": 0.0,
             "Hydroelectric Pumped Storage": 0.05,
             "Offshore Wind Turbine": 0.05,
+            "OffShoreWind_Class1_Moderate_fixed_1": 0.05,
             "Landbased Wind Turbine": 0.05,
             "Small Hydroelectric": 0.05,
             "NaturalGas_CCCCSAvgCF_Conservative": 0.4,
@@ -262,6 +272,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": 0.02,
             "NaturalGas_CCS100_Moderate": 0.4,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
+            "UtilityPV_Class1_Moderate_100": 0.0,
         }
     if settings.get("sched_outage_tech"):
         sched_outage_tech = settings["sched_outage_tech"]
@@ -278,6 +290,7 @@ def gen_projects_info_file(
             "Solar Photovoltaic": 0.0,
             "Hydroelectric Pumped Storage": 0.05,
             "Offshore Wind Turbine": 0.01,
+            "OffShoreWind_Class1_Moderate_fixed_1": 0.01,
             "Landbased Wind Turbine": 0.01,
             "Small Hydroelectric": 0.05,
             "NaturalGas_CCCCSAvgCF_Conservative": 0.6,
@@ -286,6 +299,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": 0.01,
             "NaturalGas_CCS100_Moderate": 0.6,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
+            "UtilityPV_Class1_Moderate_100": 0.0,
         }
 
     gen_project_info = generation_projects_info(
@@ -342,12 +357,17 @@ def gen_projects_info_file(
         "Solar Photovoltaic": "Solar",
         "Hydroelectric Pumped Storage": "Hydro",
         "Offshore Wind Turbine": "Wind",
+        "OffShoreWind_Class1_Moderate_fixed_1": "Wind",
         "Landbased Wind Turbine": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
+        "LandbasedWind_Class1_Moderate": "Wind",
+        "Small Hydroelectric": "Hydro",
         "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
         "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
         "NaturalGas_CTAvgCF_Moderate": "Naturalgas",
         "Battery_*_Moderate": "Storage",
         "NaturalGas_CCS100_Moderate": "Naturalgas",
+        "UtilityPV_Class1_Moderate": "Solar",
+        "UtilityPV_Class1_Moderate_100": "Solar",
     }
 
     graph_tech_types_table = gen_project_info.drop_duplicates(subset="gen_tech")

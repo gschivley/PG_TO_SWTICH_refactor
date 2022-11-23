@@ -627,10 +627,20 @@ def generation_projects_info(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    # wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
+    # ] = True
     gen_project_info.loc[
-        gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
+        gen_project_info["technology"].str.contains("Wind"), "gen_is_variable"
     ] = True
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("Solar"), "gen_is_variable"
+    ] = True
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
+    ] = True
+
     gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].fillna(
         False
     )
@@ -1361,8 +1371,10 @@ def variable_capacity_factors_table(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
-    all_gen.loc[all_gen["technology"].isin(wind_solar), "gen_is_variable"] = True
+    all_gen["temp_id"] = all_gen.index
+    all_gen.loc[all_gen["technology"].str.contains("Wind"), "gen_is_variable"] = True
+    all_gen.loc[all_gen["technology"].str.contains("Solar"), "gen_is_variable"] = True
+    all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
     # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
@@ -1380,7 +1392,7 @@ def variable_capacity_factors_table(
     # )
 
     # reg_res_cl = all_gen["region_resource_cluster"].to_list()
-    reg_res_cl = all_gen["index"].to_list()
+    reg_res_cl = all_gen["temp_id"].to_list()
     # reg_res_cl_copy =[str(i) for i in reg_res_cl]
     # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
 
