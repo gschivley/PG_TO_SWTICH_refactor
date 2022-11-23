@@ -573,6 +573,7 @@ def gen_prebuild_newbuild_info_files(
     complete_gens = pd.concat([existing_gen, newgens]).drop_duplicates(
         subset=["Resource"]
     )
+    complete_gens = add_misc_gen_values(complete_gens, gc.settings)
     gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
 
     ### edit by RR
