@@ -308,6 +308,12 @@ def gen_build_predetermined(
     plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
     pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
     pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
+    # pg_build["retirement_age"] = [
+    #     val
+    #     for key, val in retirement_ages.items()
+    #     if pg_build["technology"].str.contains(key, case=False)
+    # ]
+
     pg_build["calc_retirement_year"] = (
         pg_build["build_final"] + pg_build["retirement_age"]
     )
@@ -487,9 +493,10 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         df_list.append(df)
     combined_new_gens = pd.concat(df_list)
 
-    combined_new_gens["gen_fixed_om"] = combined_new_gens[
-        "Fixed_OM_Cost_per_MWyr"
-    ].apply(lambda x: x * 1000)
+    # combined_new_gens["gen_fixed_om"] = combined_new_gens[
+    #     "Fixed_OM_Cost_per_MWyr"
+    # ].apply(lambda x: x * 1000)
+    combined_new_gens["gen_fixed_om"] = combined_new_gens["Fixed_OM_Cost_per_MWyr"]
     combined_new_gens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
     combined_new_gens.rename(
         columns={
@@ -632,14 +639,14 @@ def generation_projects_info(
     #     gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
     # ] = True
     gen_project_info.loc[
-        gen_project_info["technology"].str.contains("Wind"), "gen_is_variable"
+        gen_project_info["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
     ] = True
     gen_project_info.loc[
-        gen_project_info["technology"].str.contains("Solar"), "gen_is_variable"
+        gen_project_info["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
     ] = True
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
-    ] = True
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
+    # ] = True
 
     gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].fillna(
         False
@@ -886,12 +893,12 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         df["outage_rate"] = list(
             map(match_hydro_forced_outage_tech, hydro_df["Resource"])
         )
-        # df['hydro_min_flow_mw'] = month_df[i].min(axis=1).to_list()
-        # df['hydro_avg_flow_mw'] = month_df[i].mean(axis=1).to_list()
-        df["hydro_min_flow_mw_raw"] = month_df[i].min(axis=1).to_list()
-        df["hydro_min_flow_mw"] = df["hydro_min_flow_mw_raw"] * (1 - df["outage_rate"])
-        df["hydro_avg_flow_mw_raw"] = month_df[i].mean(axis=1).to_list()
-        df["hydro_avg_flow_mw"] = df["hydro_avg_flow_mw_raw"] * (1 - df["outage_rate"])
+        df["hydro_min_flow_mw"] = month_df[i].min(axis=1).to_list()
+        df["hydro_avg_flow_mw"] = month_df[i].mean(axis=1).to_list()
+        # df["hydro_min_flow_mw_raw"] = month_df[i].min(axis=1).to_list()
+        # df["hydro_min_flow_mw"] = df["hydro_min_flow_mw_raw"] * (1 - df["outage_rate"])
+        # df["hydro_avg_flow_mw_raw"] = month_df[i].mean(axis=1).to_list()
+        # df["hydro_avg_flow_mw"] = df["hydro_avg_flow_mw_raw"] * (1 - df["outage_rate"])
         df_list.append(df)
     hydro_final = pd.concat(df_list, axis=0)
     # # get the index of existing gen for the hydro_project columnn (tie to GENERATION_PROJECTS)
@@ -908,9 +915,9 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         timeseries_list.append(df2)
     hydro_final_df = pd.concat(timeseries_list, axis=0)
 
-    hydro_final_df = hydro_final_df.drop(
-        columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
-    )
+    # hydro_final_df = hydro_final_df.drop(
+    #     columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
+    # )
 
     return hydro_final_df
 
@@ -1372,9 +1379,13 @@ def variable_capacity_factors_table(
         return [n for n in list1 if any(m in n for m in list2)]
 
     all_gen["temp_id"] = all_gen.index
-    all_gen.loc[all_gen["technology"].str.contains("Wind"), "gen_is_variable"] = True
-    all_gen.loc[all_gen["technology"].str.contains("Solar"), "gen_is_variable"] = True
-    all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
+    all_gen.loc[
+        all_gen["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
+    ] = True
+    all_gen.loc[
+        all_gen["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
+    ] = True
+    # all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
     # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
