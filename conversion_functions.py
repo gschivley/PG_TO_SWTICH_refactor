@@ -170,8 +170,8 @@ def gen_build_predetermined(
     Output columns
         * GENERATION_PROJECT: index from all_gen
         * build_year: using pudl_gen, pudl_gen_entity, eia excel file, and pg_build to get years
-        * gen_predetermined_cap: based on Cap_Size from all_gen
-        * gen_predetermined_storage_energy_mwh: based on capex_mwh from all_gen
+        * gen_predetermined_cap: based on Existing_Cap_MW from all_gen
+        * gen_predetermined_storage_energy_mwh: based on Existing_Cap_MWh from all_gen
     Outputs
         gen_buildpre: is the 'offical' table
         gen_build_with_id: is gen_buildpre before 2020 was taken out and with plant_id in it
@@ -308,6 +308,12 @@ def gen_build_predetermined(
     plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
     pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
     pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
+    # pg_build["retirement_age"] = [
+    #     val
+    #     for key, val in retirement_ages.items()
+    #     if pg_build["technology"].str.contains(key, case=False)
+    # ]
+
     pg_build["calc_retirement_year"] = (
         pg_build["build_final"] + pg_build["retirement_age"]
     )
@@ -335,8 +341,8 @@ def gen_build_predetermined(
         [
             "index",
             "plant_id_eia",
-            "Cap_Size",
-            "capex_mwh",
+            "Existing_Cap_MW",  # it was "Cap_Size",
+            "capex_mwh",  # Should it be "capex_mwh" or 'Existing_Cap_MWh'?
             "region",
             "plant_pudl_id",
             "technology",
@@ -377,7 +383,7 @@ def gen_build_predetermined(
 
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
-    #     new_builds = new_builds[['GENERATION_PROJECT', 'Cap_Size', 'capex_mwh']]
+    #     new_builds = new_builds[['GENERATION_PROJECT', 'Existing_Cap_MW', 'Existing_Cap_MWh']]
     #     new_builds2020 = new_builds.copy()
     #     new_builds2030 = new_builds.copy()
     #     new_builds2040 = new_builds.copy()
@@ -401,7 +407,7 @@ def gen_build_predetermined(
         ]
     ]  # this table is for comparison/testing only
     gen_buildpre = gen_buildpre[
-        ["GENERATION_PROJECT", "build_year", "Cap_Size", "capex_mwh"]
+        ["GENERATION_PROJECT", "build_year", "Existing_Cap_MW", "capex_mwh"]
     ]
 
     # don't include new builds
@@ -412,7 +418,7 @@ def gen_build_predetermined(
 
     gen_buildpre.rename(
         columns={
-            "Cap_Size": "gen_predetermined_cap",
+            "Existing_Cap_MW": "gen_predetermined_cap",
             "capex_mwh": "gen_predetermined_storage_energy_mwh",
         },
         inplace=True,
@@ -421,6 +427,9 @@ def gen_build_predetermined(
     gen_buildpre["gen_predetermined_storage_energy_mwh"] = gen_buildpre[
         "gen_predetermined_storage_energy_mwh"
     ].fillna(".")
+    gen_buildpre["gen_predetermined_storage_energy_mwh"] = gen_buildpre[
+        "gen_predetermined_storage_energy_mwh"
+    ].replace(0, ".")
 
     gen_buildpre["build_year"] = gen_buildpre["build_year"].astype(float).astype(int)
     #     gen_buildpre['GENERATION_PROJECT'] = gen_buildpre['GENERATION_PROJECT'].astype(str)
@@ -484,9 +493,10 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         df_list.append(df)
     combined_new_gens = pd.concat(df_list)
 
-    combined_new_gens["gen_fixed_om"] = combined_new_gens[
-        "Fixed_OM_Cost_per_MWyr"
-    ].apply(lambda x: x * 1000)
+    # combined_new_gens["gen_fixed_om"] = combined_new_gens[
+    #     "Fixed_OM_Cost_per_MWyr"
+    # ].apply(lambda x: x * 1000)
+    combined_new_gens["gen_fixed_om"] = combined_new_gens["Fixed_OM_Cost_per_MWyr"]
     combined_new_gens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
     combined_new_gens.rename(
         columns={
@@ -535,11 +545,6 @@ def generation_projects_info(
     all_gen,
     spur_capex_mw_mile,
     retirement_age,
-    cogen_tech,
-    baseload_tech,
-    energy_tech,
-    sched_outage_tech,
-    forced_outage_tech,
 ):
     """
     Create the generation_projects_info table based on REAM scenario 178.
@@ -560,11 +565,11 @@ def generation_projects_info(
         * gen_full_load_heat_rate: based on Heat_Rate_MMBTU_per_MWh from all_gen
             - if the energy_source is in the non_fuel_energy_sources, this should be '.'
         * gen_variable_om: based on var_om_cost_per_MWh from all_gen
-        * gen_connect_cost_per_mw: based on spur_capex_mw_mile * spur_miles
+        * gen_connect_cost_per_mw: based on spur_capex_mw_mile * spur_miles; ## plus substation cost
         * gen_dbid: same as generation_project
         * gen_scheduled_outage_rate: based on sched_outage_tech
         * gen_forced_outage_rate: based on forced_outage_tech
-        * gen_capacity_limit_mw: based on Existing_Cap_MW from all_gen
+        * gen_capacity_limit_mw: based on Existing_Cap_MW from all_gen; ## should be . to new thermo plants, should be upper limits on new renewables(millions MW total across all).
         * gen_min_build_capacity: based on REAM using 0 for now
         * gen_is_cogen: based on cogen_tech input
         * gen_storage_efficiency: based on REAM scenario 178.  batteries use 0.75
@@ -591,6 +596,14 @@ def generation_projects_info(
             "interconnect_capex_mw",
             "Eff_Up",
             "Eff_Down",
+            "VRE",
+            "Max_Cap_MW",
+            "gen_energy_source",
+            "gen_is_cogen",
+            "gen_is_baseload",
+            "gen_scheduled_outage_rate",
+            "gen_forced_outage_rate",
+            "gen_type",
         ]
     ]
 
@@ -621,10 +634,20 @@ def generation_projects_info(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    # wind_solar = set(Filter(technology, ["Wind", "Solar"]))
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
+    # ] = True
     gen_project_info.loc[
-        gen_project_info["technology"].isin(wind_solar), "gen_is_variable"
+        gen_project_info["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
     ] = True
+    gen_project_info.loc[
+        gen_project_info["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
+    ] = True
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
+    # ] = True
+
     gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].fillna(
         False
     )
@@ -643,23 +666,6 @@ def generation_projects_info(
     gen_project_info["gen_store_to_release_ratio"] = gen_project_info[
         "gen_store_to_release_ratio"
     ].fillna(".")
-
-    # based on manually created dictionaries
-    gen_project_info["gen_energy_source"] = gen_project_info["technology"].apply(
-        lambda x: energy_tech[x]
-    )
-    gen_project_info["gen_is_cogen"] = gen_project_info["technology"].apply(
-        lambda x: cogen_tech[x]
-    )
-    gen_project_info["gen_is_baseload"] = gen_project_info["technology"].apply(
-        lambda x: baseload_tech[x]
-    )
-    gen_project_info["gen_scheduled_outage_rate"] = gen_project_info[
-        "technology"
-    ].apply(lambda x: sched_outage_tech[x])
-    gen_project_info["gen_forced_outage_rate"] = gen_project_info["technology"].apply(
-        lambda x: forced_outage_tech[x]
-    )
 
     # additional columns based on REAM
     gen_project_info["gen_min_build_capacity"] = 0  # REAM is just 0 or .
@@ -689,6 +695,14 @@ def generation_projects_info(
     # GENERATION_PROJECT - the all_gen.index column has NaNs for the new generators.  Use actual index for all_gen
     gen_project_info["GENERATION_PROJECT"] = gen_project_info.index + 1
     gen_project_info["gen_dbid"] = gen_project_info["GENERATION_PROJECT"]
+
+    # gen_capacity_limit_mw - edit by RR,
+    # it was from 'Existing_Cap_MW' only, now takes the max of "Existing_Cap_MW" and "Max_Cap_MW" for new renewables.
+    gen_project_info["gen_capacity_limit_mw"] = gen_project_info["Existing_Cap_MW"]
+    gen_project_info.loc[
+        gen_project_info["VRE"] == 1, "gen_capacity_limit_mw"
+    ] = gen_project_info[["Existing_Cap_MW", "Max_Cap_MW"]].max(axis=1)
+
     # rename columns
     gen_project_info.rename(
         columns={
@@ -696,11 +710,9 @@ def generation_projects_info(
             "region": "gen_load_zone",
             "Heat_Rate_MMBTU_per_MWh": "gen_full_load_heat_rate",
             "Var_OM_Cost_per_MWh": "gen_variable_om",
-            "Existing_Cap_MW": "gen_capacity_limit_mw",
         },
         inplace=True,
     )  #'index':'GENERATION_PROJECT',
-
     # drop heat_load_shifting (not in SWITCH)
     gen_project_info.drop(
         gen_project_info[gen_project_info["gen_tech"] == "heat_load_shifting"].index,
@@ -731,6 +743,7 @@ def generation_projects_info(
         "gen_discharge_efficiency",
         "gen_land_use_rate",
         "gen_storage_energy_to_power_ratio",
+        "gen_type",
     ]  # index
 
     # remove NaN
@@ -880,12 +893,12 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         df["outage_rate"] = list(
             map(match_hydro_forced_outage_tech, hydro_df["Resource"])
         )
-        # df['hydro_min_flow_mw'] = month_df[i].min(axis=1).to_list()
-        # df['hydro_avg_flow_mw'] = month_df[i].mean(axis=1).to_list()
-        df["hydro_min_flow_mw_raw"] = month_df[i].min(axis=1).to_list()
-        df["hydro_min_flow_mw"] = df["hydro_min_flow_mw_raw"] * (1 - df["outage_rate"])
-        df["hydro_avg_flow_mw_raw"] = month_df[i].mean(axis=1).to_list()
-        df["hydro_avg_flow_mw"] = df["hydro_avg_flow_mw_raw"] * (1 - df["outage_rate"])
+        df["hydro_min_flow_mw"] = month_df[i].min(axis=1).to_list()
+        df["hydro_avg_flow_mw"] = month_df[i].mean(axis=1).to_list()
+        # df["hydro_min_flow_mw_raw"] = month_df[i].min(axis=1).to_list()
+        # df["hydro_min_flow_mw"] = df["hydro_min_flow_mw_raw"] * (1 - df["outage_rate"])
+        # df["hydro_avg_flow_mw_raw"] = month_df[i].mean(axis=1).to_list()
+        # df["hydro_avg_flow_mw"] = df["hydro_avg_flow_mw_raw"] * (1 - df["outage_rate"])
         df_list.append(df)
     hydro_final = pd.concat(df_list, axis=0)
     # # get the index of existing gen for the hydro_project columnn (tie to GENERATION_PROJECTS)
@@ -902,9 +915,9 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         timeseries_list.append(df2)
     hydro_final_df = pd.concat(timeseries_list, axis=0)
 
-    hydro_final_df = hydro_final_df.drop(
-        columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
-    )
+    # hydro_final_df = hydro_final_df.drop(
+    #     columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
+    # )
 
     return hydro_final_df
 
@@ -1365,8 +1378,14 @@ def variable_capacity_factors_table(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    wind_solar = set(Filter(technology, ["Wind", "Solar"]))
-    all_gen.loc[all_gen["technology"].isin(wind_solar), "gen_is_variable"] = True
+    all_gen["temp_id"] = all_gen.index
+    all_gen.loc[
+        all_gen["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
+    ] = True
+    all_gen.loc[
+        all_gen["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
+    ] = True
+    # all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
 
     # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
@@ -1384,7 +1403,7 @@ def variable_capacity_factors_table(
     # )
 
     # reg_res_cl = all_gen["region_resource_cluster"].to_list()
-    reg_res_cl = all_gen["index"].to_list()
+    reg_res_cl = all_gen["temp_id"].to_list()
     # reg_res_cl_copy =[str(i) for i in reg_res_cl]
     # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
 

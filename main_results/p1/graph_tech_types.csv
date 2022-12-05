@@ -15,3 +15,8 @@ default,Naturalgas,NaturalGas_CCAvgCF_Moderate,Naturalgas
 default,Naturalgas,NaturalGas_CTAvgCF_Moderate,Naturalgas
 default,Storage,Battery_*_Moderate,Electricity
 default,Naturalgas,NaturalGas_CCS100_Moderate,Naturalgas
+default,Wind,LandbasedWind_Class1_Moderate_75,Wind
+default,Solar,UtilityPV_Class1_Moderate_50,Solar
+default,Wind,OffShoreWind_Class12_Moderate_floating_0,Wind
+default,Wind,OffShoreWind_Class3_Moderate_fixed_0,Wind
+default,Wind,OffShoreWind_Class3_Moderate_fixed_1,Wind

@@ -181,6 +181,8 @@ def gen_projects_info_file(
             "Solar Photovoltaic": False,
             "Hydroelectric Pumped Storage": False,
             "Offshore Wind Turbine": False,
+            "OffShoreWind_Class1_Moderate_fixed_1": False,
+            "Landbased Wind Turbine": False,
             "Small Hydroelectric": False,
             "NaturalGas_CCCCSAvgCF_Conservative": False,
             "NaturalGas_CCAvgCF_Moderate": False,
@@ -188,6 +190,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
+            "UtilityPV_Class1_Moderate_100": False,
         }
     if settings.get("baseload_tech"):
         baseload_tech = settings.get("baseload_tech")
@@ -204,6 +208,8 @@ def gen_projects_info_file(
             "Solar Photovoltaic": False,
             "Hydroelectric Pumped Storage": False,
             "Offshore Wind Turbine": False,
+            "OffShoreWind_Class1_Moderate_fixed_1": False,
+            "Landbased Wind Turbine": False,
             "Small Hydroelectric": False,
             "NaturalGas_CCCCSAvgCF_Conservative": False,
             "NaturalGas_CCAvgCF_Moderate": False,
@@ -211,6 +217,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": False,
             "NaturalGas_CCS100_Moderate": False,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": False,
+            "UtilityPV_Class1_Moderate_100": False,
         }
     if settings.get("energy_tech"):
         energy_tech = settings["energy_tech"]
@@ -227,6 +235,9 @@ def gen_projects_info_file(
             "Solar Photovoltaic": "Solar",
             "Hydroelectric Pumped Storage": "Water",
             "Offshore Wind Turbine": "Wind",
+            "OffShoreWind_Class1_Moderate_fixed_1": "Wind",
+            "Landbased Wind Turbine": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
+            "LandbasedWind_Class1_Moderate": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
             "Small Hydroelectric": "Water",
             "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
             "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
@@ -234,6 +245,8 @@ def gen_projects_info_file(
             "Battery_*_Moderate": "Electricity",
             "NaturalGas_CCS100_Moderate": "Naturalgas",
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": "Solar",
+            "UtilityPV_Class1_Moderate_100": "Solar",
         }
     if settings.get("forced_outage_tech"):
         forced_outage_tech = settings["forced_outage_tech"]
@@ -243,20 +256,31 @@ def gen_projects_info_file(
             "Biomass": 0.04,
             "Conventional Hydroelectric": 0.05,
             "Conventional Steam Coal": 0.04,
-            "Natural Gas Fired Combined Cycle": 0.4,
-            "Natural Gas Fired Combustion Turbine": 0.4,
-            "Natural Gas Steam Turbine": 0.4,
+            # "Natural Gas Fired Combined Cycle": 0.4,
+            # "Natural Gas Fired Combustion Turbine": 0.4,
+            # "Natural Gas Steam Turbine": 0.4,
+            "Natural Gas Fired Combined Cycle": 0.04,
+            "Natural Gas Fired Combustion Turbine": 0.04,
+            "Natural Gas Steam Turbine": 0.04,
             "Nuclear": 0.04,
             "Solar Photovoltaic": 0.0,
             "Hydroelectric Pumped Storage": 0.05,
             "Offshore Wind Turbine": 0.05,
+            "OffShoreWind_Class1_Moderate_fixed_1": 0.05,
+            "Landbased Wind Turbine": 0.05,
             "Small Hydroelectric": 0.05,
-            "NaturalGas_CCCCSAvgCF_Conservative": 0.4,
-            "NaturalGas_CCAvgCF_Moderate": 0.4,
-            "NaturalGas_CTAvgCF_Moderate": 0.4,
+            # "NaturalGas_CCCCSAvgCF_Conservative": 0.4,
+            # "NaturalGas_CCAvgCF_Moderate": 0.4,
+            # "NaturalGas_CTAvgCF_Moderate": 0.4,
+            # "NaturalGas_CCS100_Moderate": 0.4,
+            "NaturalGas_CCCCSAvgCF_Conservative": 0.04,
+            "NaturalGas_CCAvgCF_Moderate": 0.04,
+            "NaturalGas_CTAvgCF_Moderate": 0.04,
+            "NaturalGas_CCS100_Moderate": 0.04,
             "Battery_*_Moderate": 0.02,
-            "NaturalGas_CCS100_Moderate": 0.4,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
+            "UtilityPV_Class1_Moderate_100": 0.0,
         }
     if settings.get("sched_outage_tech"):
         sched_outage_tech = settings["sched_outage_tech"]
@@ -266,31 +290,37 @@ def gen_projects_info_file(
             "Biomass": 0.06,
             "Conventional Hydroelectric": 0.05,
             "Conventional Steam Coal": 0.06,
-            "Natural Gas Fired Combined Cycle": 0.6,
-            "Natural Gas Fired Combustion Turbine": 0.6,
-            "Natural Gas Steam Turbine": 0.6,
+            # "Natural Gas Fired Combined Cycle": 0.6,
+            # "Natural Gas Fired Combustion Turbine": 0.6,
+            # "Natural Gas Steam Turbine": 0.6,
+            "Natural Gas Fired Combined Cycle": 0.06,
+            "Natural Gas Fired Combustion Turbine": 0.06,
+            "Natural Gas Steam Turbine": 0.06,
             "Nuclear": 0.06,
             "Solar Photovoltaic": 0.0,
             "Hydroelectric Pumped Storage": 0.05,
             "Offshore Wind Turbine": 0.01,
+            "OffShoreWind_Class1_Moderate_fixed_1": 0.01,
+            "Landbased Wind Turbine": 0.01,
             "Small Hydroelectric": 0.05,
-            "NaturalGas_CCCCSAvgCF_Conservative": 0.6,
-            "NaturalGas_CCAvgCF_Moderate": 0.6,
-            "NaturalGas_CTAvgCF_Moderate": 0.6,
+            # "NaturalGas_CCCCSAvgCF_Conservative": 0.6,
+            # "NaturalGas_CCAvgCF_Moderate": 0.6,
+            # "NaturalGas_CTAvgCF_Moderate": 0.6,
+            # "NaturalGas_CCS100_Moderate": 0.6,
+            "NaturalGas_CCCCSAvgCF_Conservative": 0.06,
+            "NaturalGas_CCAvgCF_Moderate": 0.06,
+            "NaturalGas_CTAvgCF_Moderate": 0.06,
+            "NaturalGas_CCS100_Moderate": 0.06,
             "Battery_*_Moderate": 0.01,
-            "NaturalGas_CCS100_Moderate": 0.6,
             "heat_load_shifting": False,
+            "UtilityPV_Class1_Moderate": 0.0,
+            "UtilityPV_Class1_Moderate_100": 0.0,
         }
 
     gen_project_info = generation_projects_info(
         complete_gens,
         settings.get("transmission_investment_cost")["spur"]["capex_mw_mile"],
         settings.get("retirement_ages"),
-        cogen_tech,
-        baseload_tech,
-        energy_tech,
-        sched_outage_tech,
-        forced_outage_tech,
     )
 
     graph_tech_colors_data = {
@@ -341,25 +371,27 @@ def gen_projects_info_file(
         "Solar Photovoltaic": "Solar",
         "Hydroelectric Pumped Storage": "Hydro",
         "Offshore Wind Turbine": "Wind",
+        "OffShoreWind_Class1_Moderate_fixed_1": "Wind",
+        "Landbased Wind Turbine": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
+        "LandbasedWind_Class1_Moderate": "Wind",
+        "Small Hydroelectric": "Hydro",
         "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
         "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
         "NaturalGas_CTAvgCF_Moderate": "Naturalgas",
         "Battery_*_Moderate": "Storage",
         "NaturalGas_CCS100_Moderate": "Naturalgas",
+        "UtilityPV_Class1_Moderate": "Solar",
+        "UtilityPV_Class1_Moderate_100": "Solar",
     }
 
-    gen_tech = gen_project_info["gen_tech"].unique()
-    graph_tech_types_table = pd.DataFrame(
-        columns=["map_name", "gen_type", "gen_tech", "energy_source"]
-    )
-    graph_tech_types_table["gen_tech"] = gen_tech
-    graph_tech_types_table["energy_source"] = graph_tech_types_table["gen_tech"].apply(
-        lambda x: energy_tech[x]
-    )
+    graph_tech_types_table = gen_project_info.drop_duplicates(subset="gen_tech")
     graph_tech_types_table["map_name"] = "default"
-    graph_tech_types_table["gen_type"] = graph_tech_types_table["gen_tech"].apply(
-        lambda x: gen_type_tech[x]
-    )
+    graph_tech_types_table["energy_source"] = graph_tech_types_table[
+        "gen_energy_source"
+    ]
+
+    cols = ["map_name", "gen_type", "gen_tech", "energy_source"]
+    graph_tech_types_table = graph_tech_types_table[cols]
 
     # settings = load_settings(path=settings_file)
     # pudl_engine, pudl_out, pg_engine = init_pudl_connection(
@@ -406,6 +438,9 @@ def gen_prebuild_newbuild_info_files(
     out_folder.mkdir(parents=True, exist_ok=True)
     settings = settings_list[0]
     all_gen = gc.create_all_generators()
+    all_gen = add_misc_gen_values(all_gen, settings)
+    all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
+    all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
@@ -542,6 +577,8 @@ def gen_prebuild_newbuild_info_files(
     for settings in settings_list:
         gc.settings = settings
         new_gen = gc.create_new_generators()
+        new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
+        new_gen["technology"] = new_gen["technology"].str.rstrip("_")
         new_gen["build_year"] = settings["model_year"]
         df_list.append(new_gen)
 
@@ -570,7 +607,7 @@ def gen_prebuild_newbuild_info_files(
     complete_gens = pd.concat([existing_gen, newgens]).drop_duplicates(
         subset=["Resource"]
     )
-    complete_gens = add_misc_gen_values(complete_gens, gc.settings)
+    complete_gens = add_misc_gen_values(complete_gens, settings)
     gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
 
     ### edit by RR
@@ -710,10 +747,10 @@ def transmission_tables(settings, out_folder, pg_engine):
     )
 
     line_loss = network_line_loss(transmission=transmission, settings=settings)
-    network_reinforcement_cost_df = network_reinforcement_cost(
+    reinforcement_cost = network_reinforcement_cost(
         transmission=transmission, settings=settings
     )
-    network_max_reinforcement_df = network_max_reinforcement(
+    max_reinforcement = network_max_reinforcement(
         transmission=transmission, settings=settings
     )
     transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
@@ -752,7 +789,7 @@ def transmission_tables(settings, out_folder, pg_engine):
         return t_line
 
     transmission_lines = transmission_lines_table(
-        line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict
+        line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict, settings
     )
     transmission_lines
 

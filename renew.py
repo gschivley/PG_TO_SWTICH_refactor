@@ -448,7 +448,7 @@ pg_build = pg_build[
     [
         "plant_id_eia",
         "generator_id",
-        "unit_id_pg",
+        "unit_id_pudl",
         "planned_retirement_date",
         "operating_date",
         "Operating Year",
@@ -506,7 +506,7 @@ def plant_pudl_id(df):
     Create unique id for generator by combining plant_id_eia and unit_pudl_id
     """
     df["plant_pudl_id"] = (
-        df["plant_id_eia"].astype(str) + "_" + df["unit_id_pg"].astype(str)
+        df["plant_id_eia"].astype(str) + "_" + df["unit_id_pudl"].astype(str)
     )
     return df
 

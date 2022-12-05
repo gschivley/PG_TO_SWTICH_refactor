@@ -92,3 +92,5 @@ venv.bak/
 *.ipynb
 .DS_Store
 !/notebooks/*
+# Ignore csv data files
+*.csv 
