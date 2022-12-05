@@ -32,8 +32,6 @@ from powergenome.external_data import (
 )
 from powergenome.GenX import add_misc_gen_values
 
-os.getcwd()
-
 from conversion_functions import (
     switch_fuel_cost_table,
     switch_fuels,
@@ -580,6 +578,7 @@ def gen_prebuild_newbuild_info_files(
         new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
         new_gen["technology"] = new_gen["technology"].str.rstrip("_")
         new_gen["build_year"] = settings["model_year"]
+        new_gen["GENERATION_PROJECT"] = new_gen["Resource"]
         df_list.append(new_gen)
 
     newgens = pd.concat(df_list, ignore_index=True)
