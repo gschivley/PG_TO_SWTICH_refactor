@@ -10,6 +10,7 @@ onshore_wind_turbine,,0,1,1,1,0,0,1,1,0,0,0,0,-1,-1,-1,0.083333333,0.166666667,W
 small_hydroelectric,,0,1,1,1,0,0,1,1,0,0,0,0,-1,-1,-1,0.083333333,0.166666667,Water,FALSE,FALSE,0.05,0.05,Hydro
 solar_photovoltaic,,0,1,1,1,0,0,1,1,0,0,0,0,-1,-1,-1,0.083333333,0.166666667,Solar,FALSE,FALSE,0,0,Solar
 conventional_steam_coal,,0,1,1,1,0,0,0.57,0.57,24,24,0,0,-1,-1,-1,0.083333333,0.166666667,Coal,FALSE,TRUE,0.06,0.04,Coal
+coal,,0,1,1,1,0,0,0.57,0.57,24,24,0,0,-1,-1,-1,0.083333333,0.166666667,Coal,FALSE,TRUE,0.06,0.04,Coal
 offshore_wind,,0,1,1,1,0,0,1,1,0,0,0,0,-1,-1,-1,0.083333333,0.166666667,Wind,FALSE,FALSE,0,0.05,Wind
 naturalgas_ccccsavgcf,0.6,0,1,1,1,0,0,0.64,0.64,6,6,0,0,-1,-1,-1,0.083333333,0.166666667,Naturalgas,FALSE,FALSE,0.6,0.4,Naturalgas
 naturalgas_ccs100,0.6,0,1,1,1,0,0,0.64,0.64,6,6,0,0,-1,-1,-1,0.083333333,0.166666667,Naturalgas,FALSE,FALSE,0.6,0.4,Naturalgas
