@@ -85,12 +85,12 @@ def create_dict_plantgen(df, column):
     return dictionary
 
 
-def create_dict_plantpudl(df, column):
+def create_dict_plantpudl(df: pd.DataFrame, column: str):
     """
     Create dictionary from two columns, removing na's beforehand
     {plant_pudl_id: year}
     """
-    df = df[df[column] != "nan"]
+    df = df.dropna(subset=["build_final"])
     ids = df["plant_pudl_id"].to_list()
     dates = df[column].to_list()
     dictionary = dict(zip(ids, dates))
@@ -135,17 +135,17 @@ def plant_pudl_id(df):
 
 
 def gen_build_predetermined(
-    all_gen,
-    pudl_gen,
-    pudl_gen_entity,
-    pg_build,
-    manual_build_yr,
-    eia_Gen,
-    eia_Gen_prop,
-    plant_gen_manual,
-    plant_gen_manual_proposed,
-    plant_gen_manual_retired,
-    retirement_ages,
+    all_gen: pd.DataFrame,
+    pudl_gen: pd.DataFrame,
+    pudl_gen_entity: pd.DataFrame,
+    pg_build: pd.DataFrame,
+    manual_build_yr: dict,
+    eia_Gen: pd.DataFrame,
+    eia_Gen_prop: pd.DataFrame,
+    plant_gen_manual: dict,
+    plant_gen_manual_proposed: dict,
+    plant_gen_manual_retired: dict,
+    retirement_ages: dict,
 ):
     """
     Create the gen_build_predetermined table
@@ -339,7 +339,8 @@ def gen_build_predetermined(
     gen_buildpre = all_gen.copy()
     # Use the unique "Resource" column for the generation project ID
     gen_buildpre["GENERATION_PROJECT"] = gen_buildpre["Resource"]
-    gen_buildpre = gen_buildpre[
+    gen_buildpre = gen_buildpre.loc[
+        :,
         [
             "index",
             "GENERATION_PROJECT",
@@ -349,7 +350,7 @@ def gen_build_predetermined(
             "region",
             "plant_pudl_id",
             "technology",
-        ]
+        ],
     ]
 
     # this ignores new builds
