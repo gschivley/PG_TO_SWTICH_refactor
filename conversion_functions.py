@@ -448,6 +448,10 @@ def gen_build_predetermined(
     ].replace(0, ".")
 
     gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
+
+    gen_buildpre = gen_buildpre.groupby(
+        ["GENERATION_PROJECT", "build_year"], as_index=False
+    ).sum()
     #     gen_buildpre['GENERATION_PROJECT'] = gen_buildpre['GENERATION_PROJECT'].astype(str)
 
     # SWITCH doesn't like having build years that are in the period
@@ -532,6 +536,9 @@ def gen_build_costs_table(existing_gen, newgens):
     gen_build_costs = existing.append(newgens, ignore_index=True)
 
     gen_build_costs["build_year"] = gen_build_costs["build_year"].astype("Int64")
+    gen_build_costs = gen_build_costs.groupby(
+        ["GENERATION_PROJECT", "build_year"], as_index=False
+    ).mean()
     #     gen_build_costs.drop('index', axis=1, inplace=True)
 
     # gen_storage_energy_overnight_cost should only be for batteries
