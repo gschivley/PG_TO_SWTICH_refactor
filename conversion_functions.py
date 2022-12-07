@@ -146,6 +146,7 @@ def gen_build_predetermined(
     plant_gen_manual_proposed: dict,
     plant_gen_manual_retired: dict,
     retirement_ages: dict,
+    capacity_col: str,
 ):
     """
     Create the gen_build_predetermined table
@@ -298,15 +299,15 @@ def gen_build_predetermined(
         "proposed_year",
         "proposed_manual_year",
     ]
-    pg_build["build_final"] = pg_build[op_columns].max(axis=1)
+    pg_build["build_year"] = pg_build[op_columns].max(axis=1)
     # get all build years into one column (includes manual dates and proposed dates)
 
-    plant_unit_tech = all_gen.dropna(subset=["plant_pudl_id"])[
-        ["plant_pudl_id", "technology"]
-    ]
-    plant_unit_tech = plant_unit_tech.drop_duplicates(subset=["plant_pudl_id"])
-    plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
-    pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
+    # plant_unit_tech = all_gen.dropna(subset=["plant_pudl_id"])[
+    #     ["plant_pudl_id", "technology"]
+    # ]
+    # plant_unit_tech = plant_unit_tech.drop_duplicates(subset=["plant_pudl_id"])
+    # plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
+    # pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
     pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
     # pg_build["retirement_age"] = [
     #     val
@@ -315,7 +316,7 @@ def gen_build_predetermined(
     # ]
 
     pg_build["calc_retirement_year"] = (
-        pg_build["build_final"] + pg_build["retirement_age"]
+        pg_build["build_year"] + pg_build["retirement_age"]
     )
     if not pg_build.query("retirement_age.isna()").empty:
         missing_techs = pg_build.query("retirement_age.isna()")["technology"].unique()
@@ -330,7 +331,7 @@ def gen_build_predetermined(
         "eia_gen_retired_yr",
         "calc_retirement_year",
     ]
-    pg_build["retire_year_final"] = pg_build[ret_columns].min(axis=1)
+    pg_build["retirement_year"] = pg_build[ret_columns].min(axis=1)
 
     """
     Start creating the gen_build_predetermined table
@@ -354,21 +355,33 @@ def gen_build_predetermined(
     ]
 
     # this ignores new builds
-    new_builds = gen_buildpre[gen_buildpre["index"].isna()]
-    gen_buildpre = gen_buildpre[gen_buildpre["index"].notna()]
+    new_builds = gen_buildpre[gen_buildpre["Existing_Cap_MW"].isna()]
+    gen_buildpre = gen_buildpre[gen_buildpre["Existing_Cap_MW"].notna()]
 
     # create dictionary to go from pg_build to gen_buildpre (build_year)
-    pg_build_buildyr = create_dict_plantpudl(pg_build, "build_final")
-    gen_buildpre["build_year"] = gen_buildpre["plant_pudl_id"].apply(
-        lambda x: plant_dict(x, pg_build_buildyr)
+    gen_buildpre = pd.merge(
+        gen_buildpre,
+        pg_build[
+            [
+                "plant_pudl_id",
+                "build_year",
+                "retirement_year",
+                capacity_col,
+                "capacity_mwh",
+            ]
+        ],
+        how="left",
     )
+    # pg_build_buildyr = create_dict_plantpudl(pg_build, "build_final")
+    # gen_buildpre["build_year"] = gen_buildpre["plant_pudl_id"].apply(
+    #     lambda x: plant_dict(x, pg_build_buildyr)
+    # )
 
-    # create dictionary to go from pg_build to gen_buildpre (retirement_year)
-    pg_retireyr = pg_build["retire_year_final"].to_list()
-    pg_build_retireyr = create_dict_plantpudl(pg_build, "retire_year_final")
-    gen_buildpre["retirement_year"] = gen_buildpre["plant_pudl_id"].apply(
-        lambda x: plant_dict(x, pg_build_retireyr)
-    )
+    # # create dictionary to go from pg_build to gen_buildpre (retirement_year)
+    # pg_build_retireyr = create_dict_plantpudl(pg_build, "retire_year_final")
+    # gen_buildpre["retirement_year"] = gen_buildpre["plant_pudl_id"].apply(
+    #     lambda x: plant_dict(x, pg_build_retireyr)
+    # )
 
     # for plants that still don't have a build year but have a retirement year.
     # Base build year off of retirement year: retirement year - retirement age (based on technology)
@@ -408,7 +421,7 @@ def gen_build_predetermined(
         ]
     ]  # this table is for comparison/testing only
     gen_buildpre = gen_buildpre[
-        ["GENERATION_PROJECT", "build_year", "Existing_Cap_MW", "capex_mwh"]
+        ["GENERATION_PROJECT", "build_year", capacity_col, "capacity_mwh"]
     ]
 
     # don't include new builds
@@ -421,8 +434,8 @@ def gen_build_predetermined(
     # TODO: #2 should use Existing_Cap_MW instead of Cap_Size for existing capacity
     gen_buildpre.rename(
         columns={
-            "Existing_Cap_MW": "gen_predetermined_cap",
-            "capex_mwh": "gen_predetermined_storage_energy_mwh",
+            capacity_col: "gen_predetermined_cap",
+            "capacity_mwh": "gen_predetermined_storage_energy_mwh",
         },
         inplace=True,
     )
@@ -445,7 +458,7 @@ def gen_build_predetermined(
     return gen_buildpre, gen_build_with_id
 
 
-def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen):
+def gen_build_costs_table(existing_gen, newgens):
     """
     Create gen_build_costs table based off of REAM Scenarior 178.
     Inputs
@@ -468,11 +481,11 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
 
     existing = existing_gen.copy()
     #     existing = existing[['index','plant_id_eia']]
-    existing["GENERATION_PROJECT"] = existing["Resource"]
-    #     existing['GENERATION_PROJECT'] = existing['GENERATION_PROJECT'].astype(str)
-    existing["build_year"] = existing["GENERATION_PROJECT"].apply(
-        lambda x: build_yr_plantid_dict[x]
-    )
+    # existing["GENERATION_PROJECT"] = existing["Resource"]
+    # #     existing['GENERATION_PROJECT'] = existing['GENERATION_PROJECT'].astype(str)
+    # existing["build_year"] = existing["GENERATION_PROJECT"].apply(
+    #     lambda x: build_yr_plantid_dict[x]
+    # )
     existing["gen_overnight_cost"] = 0
     existing["gen_fixed_om"] = 0
     existing["gen_storage_energy_overnight_cost"] = 0
@@ -486,22 +499,19 @@ def gen_build_costs_table(existing_gen, newgens, build_yr_plantid_dict, all_gen)
         ]
     ]
 
-    df_list = []
-    for year, df in newgens.groupby("build_year"):
-        # start the new GENERATION_PROJECT ids from the end of existing_gen (should tie out to same as gen_proj_info)
-        df["GENERATION_PROJECT"] = range(
-            existing.shape[0] + 1, existing.shape[0] + 1 + df.shape[0]
-        )
-        df["GENERATION_PROJECT"] = df["GENERATION_PROJECT"].astype(str)
-        df_list.append(df)
-    combined_new_gens = pd.concat(df_list)
+    # df_list = []
+    # for year, df in newgens.groupby("build_year"):
+    #     # start the new GENERATION_PROJECT ids from the end of existing_gen (should tie out to same as gen_proj_info)
+    #     df["GENERATION_PROJECT"] = df["GENERATION_PROJECT"] + f"_{year}"
+    #     df_list.append(df)
+    # combined_new_gens = pd.concat(df_list)
 
     # combined_new_gens["gen_fixed_om"] = combined_new_gens[
     #     "Fixed_OM_Cost_per_MWyr"
     # ].apply(lambda x: x * 1000)
-    combined_new_gens["gen_fixed_om"] = combined_new_gens["Fixed_OM_Cost_per_MWyr"]
-    combined_new_gens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
-    combined_new_gens.rename(
+    newgens["gen_fixed_om"] = newgens["Fixed_OM_Cost_per_MWyr"]
+    newgens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
+    newgens.rename(
         columns={
             "capex_mw": "gen_overnight_cost",
             "capex_mwh": "gen_storage_energy_overnight_cost",
@@ -1318,14 +1328,14 @@ def variable_capacity_factors_table(
     """
 
     v_capacity_factors = all_gen_variability.copy().transpose()
-    v_capacity_factors["GENERATION_PROJECT"] = v_capacity_factors.index
+    v_capacity_factors["GENERATION_PROJECT"] = all_gen["Resource"].values
     v_c_f = v_capacity_factors.melt(
         id_vars="GENERATION_PROJECT",
         var_name="year_hour",
         value_name="gen_max_capacity_factor",
     )
     # reduce variability to just the hours of the year that have a timepoint
-    v_c_f = v_c_f[v_c_f["year_hour"].isin(year_hour)]
+    v_c_f = v_c_f.loc[v_c_f["year_hour"].isin(year_hour), :]
 
     mod_vcf = v_c_f.copy()
     # get the dates from hour of the year
@@ -1369,7 +1379,7 @@ def variable_capacity_factors_table(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    all_gen["temp_id"] = all_gen.index
+    # all_gen["temp_id"] = all_gen.index
     all_gen.loc[
         all_gen["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
     ] = True
@@ -1394,15 +1404,17 @@ def variable_capacity_factors_table(
     # )
 
     # reg_res_cl = all_gen["region_resource_cluster"].to_list()
-    reg_res_cl = all_gen["temp_id"].to_list()
+    # reg_res_cl = all_gen["temp_id"].to_list()
     # reg_res_cl_copy =[str(i) for i in reg_res_cl]
     # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
 
-    var_cap_fac["GENERATION_PROJECT"] = [
-        int(i) for i in var_cap_fac["GENERATION_PROJECT"]
-    ]
+    # var_cap_fac["GENERATION_PROJECT"] = [
+    #     int(i) for i in var_cap_fac["GENERATION_PROJECT"]
+    # ]
 
-    var_cap_fac = var_cap_fac[var_cap_fac["GENERATION_PROJECT"].isin(reg_res_cl)]
+    var_cap_fac = var_cap_fac[
+        var_cap_fac["GENERATION_PROJECT"].isin(all_gen["Resource"])
+    ]
 
     # filter to final columns
     var_cap_fac = var_cap_fac[

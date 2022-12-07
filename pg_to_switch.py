@@ -439,7 +439,7 @@ def gen_prebuild_newbuild_info_files(
     all_gen = add_misc_gen_values(all_gen, settings)
     all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
     all_gen["technology"] = all_gen["technology"].str.rstrip("_")
-    all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
+    # all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
     existing_gen = all_gen.loc[
         all_gen["plant_id_eia"].notna(), :
     ]  # gc.create_region_technology_clusters()
@@ -537,10 +537,24 @@ def gen_prebuild_newbuild_info_files(
             "operating_date",
             "operating_year",
             "retirement_year",
+            settings.get("capacity_col", "capacity_mw"),
+            "capacity_mwh",
+            "technology",
         ]
     ]
 
     retirement_ages = settings.get("retirement_ages")
+
+    row_list = []
+    for row in all_gen.itertuples():
+        if isinstance(row.plant_id_eia, list):
+            for plant_id, unit_id in zip(row.plant_id_eia, row.unit_id_pg):
+                new_row = row._replace(plant_id_eia=plant_id, unit_id_pg=unit_id)
+                row_list.append(new_row)
+        else:
+            row_list.append(row)
+    all_gen_units = pd.DataFrame(row_list)
+    all_gen_units["plant_id_eia"] = all_gen_units["plant_id_eia"].astype("Int64")
 
     # add in the plant+generator ids to pg_build and pudl tables (plant_id_eia + generator_id)
     pudl_gen = plant_gen_id(pudl_gen)
@@ -549,10 +563,10 @@ def gen_prebuild_newbuild_info_files(
 
     # add in the plant+pudl id to the all_gen and pg_build tables (plant_id_eia + unit_pudl_id)
     pg_build = plant_pudl_id(pg_build)
-    all_gen = plant_pudl_id(all_gen)
+    all_gen_units = plant_pudl_id(all_gen_units)
 
     gen_buildpre, gen_build_with_id = gen_build_predetermined(
-        all_gen,
+        all_gen_units,
         pudl_gen,
         pudl_gen_entity,
         pg_build,
@@ -563,6 +577,7 @@ def gen_prebuild_newbuild_info_files(
         {},  # plant_gen_manual_proposed,
         {},  # plant_gen_manual_retired,
         retirement_ages,
+        settings.get("capacity_col", "capacity_mw"),
     )
 
     retired = gen_build_with_id.loc[
@@ -578,7 +593,9 @@ def gen_prebuild_newbuild_info_files(
         new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
         new_gen["technology"] = new_gen["technology"].str.rstrip("_")
         new_gen["build_year"] = settings["model_year"]
-        new_gen["GENERATION_PROJECT"] = new_gen["Resource"]
+        new_gen["GENERATION_PROJECT"] = new_gen[
+            "Resource"
+        ]  # + f"_{settings['model_year']}"
         df_list.append(new_gen)
 
     newgens = pd.concat(df_list, ignore_index=True)
@@ -588,19 +605,17 @@ def gen_prebuild_newbuild_info_files(
     gen_project = gen_build_with_id["GENERATION_PROJECT"].to_list()
     build_yr_plantid_dict = dict(zip(gen_project, build_yr_list))
 
-    gen_build_costs = gen_build_costs_table(
-        existing_gen, newgens, build_yr_plantid_dict, all_gen
-    )
+    gen_build_costs = gen_build_costs_table(gen_buildpre, newgens)
 
-    gen_build_costs.drop(
-        gen_build_costs[gen_build_costs["GENERATION_PROJECT"].isin(retired_ids)].index,
-        inplace=True,
-    )
+    # gen_build_costs.drop(
+    #     gen_build_costs[gen_build_costs["GENERATION_PROJECT"].isin(retired_ids)].index,
+    #     inplace=True,
+    # )
     # drop retired plants
-    gen_buildpre.drop(
-        gen_buildpre[gen_buildpre["GENERATION_PROJECT"].isin(retired_ids)].index,
-        inplace=True,
-    )
+    # gen_buildpre.drop(
+    #     gen_buildpre[gen_buildpre["GENERATION_PROJECT"].isin(retired_ids)].index,
+    #     inplace=True,
+    # )
 
     # Create a complete list of existing and new-build options
     complete_gens = pd.concat([existing_gen, newgens]).drop_duplicates(
@@ -660,7 +675,7 @@ def gen_prebuild_newbuild_info_files(
         all_gen_variability, year_hour, timepoints_dict, all_gen
     )
 
-    balancing_tables(settings, pudl_engine, all_gen, out_folder)
+    balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
     hydro_timeseries_table = hydro_timeseries(
         existing_gen, hydro_variability_new, period_list
     )
