@@ -958,16 +958,16 @@ eia_atb_tech_map:
 # TAYLOR - landbasedWind and OffshoreWind has changed
 # wiki: https://github.com/PowerGenome/PowerGenome/wiki/Namespaces
 atb_new_gen:
+  - [Coal, CCS90AvgCF, Moderate, 500]
   - [NaturalGas, CCCCSAvgCF, Conservative, 500] # ATB CCCCS conservative case represents current technology. TAYLOR: Conservative vs Low
   - [NaturalGas, CCAvgCF, Moderate, 500] # TAYLOR - Mid VS Moderate
   - [NaturalGas, CTAvgCF, Moderate, 100] # TAYLOR - Mid VS Moderate
-  - [LandbasedWind, Class1, Moderate, 1] # TAYLOR - tech detail was LTRG4, based on Wiki updated to Class1. Mid VS Moderate
-  # - [OffShoreWind, Class1, Moderate, 1] # TAYLOR - tech detail was OTRG3, based on Wiki updated to Class1. Mid VS Moderate
-  - [OffShoreWind, Class3, Moderate, 1] # Rangrang - from slack with Greg
+  - [LandbasedWind, Class3, Moderate, 1] # TAYLOR - tech detail was LTRG4, based on Wiki updated to Class1. Mid VS Moderate
   - [OffShoreWind, Class12, Moderate, 1] # Rangrang - from slack with Greg
+  - [OffShoreWind, Class3, Moderate, 1] # Rangrang - from slack with Greg
   - [UtilityPV, Class1, Moderate, 1] # TAYLOR - Mid VS Moderate. Class1 vs KansasCity
   - [Battery, "*", Moderate, 1] # TAYLOR - Mid VS Moderate
-  # - [Nuclear, Nuclear, Moderate, 500]
+  - [Nuclear, Nuclear, Moderate, 2000]
 
 
 # Additional technologies can be specified in a csv file under data/additional_technologies
@@ -1025,6 +1025,26 @@ renewables_clusters:
   #   max_clusters: 3
   #   min_capacity: 100000
   #   # cap_multiplier: 0.2  
+  - region: ERC_PHDL_WEST
+    technology: landbasedwind
+    max_clusters: 1
+    max_lcoe: 150
+    min_capacity: 2000
+  - region: ERC_PHDL_WEST
+    technology: utilitypv
+    max_clusters: 1
+    min_capacity: 17100
+    max_lcoe: 150
+  - region: ERC_WEST
+    technology: landbasedwind
+    max_clusters: 1
+    max_lcoe: 150
+    min_capacity: 2000
+  - region: ERC_WEST
+    technology: utilitypv
+    max_clusters: 1
+    min_capacity: 17100
+    max_lcoe: 150
   - region: FRCC
     technology: landbasedwind
     max_clusters: 1
