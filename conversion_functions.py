@@ -439,6 +439,13 @@ def gen_build_predetermined(
         },
         inplace=True,
     )
+    gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
+    gen_buildpre = gen_buildpre.groupby(
+        ["GENERATION_PROJECT", "build_year"],
+        as_index=False,
+        dropna=False,
+        sort=False,
+    ).sum()
     # based on REAM
     gen_buildpre["gen_predetermined_storage_energy_mwh"] = gen_buildpre[
         "gen_predetermined_storage_energy_mwh"
@@ -446,12 +453,8 @@ def gen_build_predetermined(
     gen_buildpre["gen_predetermined_storage_energy_mwh"] = gen_buildpre[
         "gen_predetermined_storage_energy_mwh"
     ].replace(0, ".")
+    gen_buildpre = gen_buildpre.dropna(subset=["build_year"])
 
-    gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
-
-    gen_buildpre = gen_buildpre.groupby(
-        ["GENERATION_PROJECT", "build_year"], as_index=False
-    ).sum()
     #     gen_buildpre['GENERATION_PROJECT'] = gen_buildpre['GENERATION_PROJECT'].astype(str)
 
     # SWITCH doesn't like having build years that are in the period
