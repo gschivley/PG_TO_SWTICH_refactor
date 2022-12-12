@@ -439,6 +439,10 @@ def gen_build_predetermined(
         },
         inplace=True,
     )
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8964179 (change hydro_project column of hydro_timeseries)
     gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
     gen_buildpre = gen_buildpre.groupby(
         ["GENERATION_PROJECT", "build_year"],
@@ -664,7 +668,7 @@ def generation_projects_info(
     )
 
     # gen_storage_efficiency and gen_store_to_release_ratio: battery info based on REAM
-    battery = set(Filter(technology, ["Battery", "Batteries"]))
+    battery = set(Filter(technology, ["Battery", "Batteries", "Storage"]))
     gen_project_info.loc[
         gen_project_info["technology"].isin(battery), "gen_storage_efficiency"
     ] = (gen_project_info[["Eff_Up", "Eff_Down"]].mean(axis=1) ** 2)
@@ -812,9 +816,9 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
     #### edit by RR
     # filter existing gen to just hydro technologies
     hydro_df = existing_gen.copy()
-    hydro_df["index"] = hydro_df.index
+    # hydro_df["index"] = hydro_df.index
     hydro_df = hydro_df[hydro_df["technology"].isin(hydro_list)]
-    hydro_indx = hydro_df["index"].to_list()
+    hydro_indx = hydro_df["Resource"].to_list()
     hydro_region = hydro_df["region"].to_list()
 
     # get existing variability for the hydro technologies
@@ -916,8 +920,7 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
     # hydro_index_dict = dict(zip(hydro_df['region_resource_cluster'].to_list(), hydro_df['index'].to_list()))
     # hydro_final['hydro_project'] = hydro_final['hydro_project'].apply(lambda x: hydro_index_dict[x])
     # # generation_project starts wtih 1 not 0
-    hydro_final["hydro_project"] = hydro_final["hydro_project"].apply(lambda x: x + 1)
-
+    # hydro_final["hydro_project"] = hydro_final["hydro_project"].apply(lambda x: x + 1)
     timeseries_list = list()
     for decade in period_list:
         df2 = hydro_final.copy()

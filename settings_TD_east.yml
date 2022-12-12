@@ -369,8 +369,8 @@ small_hydro_regions:
 # ERC is texas
 # The rest is eastern
 model_regions:
-  - ERC_REST
-  - ERC_PHDL_WEST
+  # - ERC_REST
+  # - ERC_PHDL_WEST
   # - FRCC
   # - MIS_AMSO
   # - MIS_AR
@@ -386,9 +386,9 @@ model_regions:
   # - MIS_MO
   # - MIS_WOTA
   # - MIS_WUMS
-  # - NENG_CT
-  # #- NENG_ME
-  # #- NENGREST
+  - NENG_CT
+  - NENG_ME
+  - NENGREST
   # - NY_Z_A
   # - NY_Z_B
   # - NY_Z_C&E
@@ -435,10 +435,10 @@ model_regions:
 
 
 # Comment out this setting if no aggregated regions are included in the study.
-region_aggregations:
-  ERC_PHDL_WEST: [ERC_PHDL, ERC_WEST]
-  # CA_N: [WEC_CALN, WEC_BANC]
-  # CA_S: [WEC_LADW, WECC_SCE, WEC_SDGE, WECC_IID]
+# region_aggregations:
+#   ERC_PHDL_WEST: [ERC_PHDL, ERC_WEST]
+#   # CA_N: [WEC_CALN, WEC_BANC]
+#   # CA_S: [WEC_LADW, WECC_SCE, WEC_SDGE, WECC_IID]
 
 
 regional_capacity_reserves: # TAYLOR - changed to 1. PG code seems to not like it when it is just ~
@@ -603,6 +603,12 @@ retirement_ages: # TAYLOR - https://www.nrel.gov/docs/fy22osti/80641.pdf (pdf pa
   OffShoreWind_Class3_Moderate_fixed_0: 30
   OffShoreWind_Class3_Moderate_fixed_1: 30
   ####
+  ####### add retirement year for atb and ccccs options by rangrang ---need to be checked
+  Coal_CCS90AvgCF_Moderate: 65
+  Nuclear_Nuclear_Moderate: 80
+  LandbasedWind_Class3_Moderate_150: 30
+  UtilityPV_Class1_Moderate_150: 30
+  LandbasedWind_Class3_Moderate_75: 30  
 
 
 # CLUSTER TAGS
