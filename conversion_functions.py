@@ -550,7 +550,9 @@ def gen_build_costs_table(existing_gen, newgens):
 
     # gen_storage_energy_overnight_cost should only be for batteries
     gen_build_costs.loc[
-        ~gen_build_costs["GENERATION_PROJECT"].str.contains("batter", case=False),
+        ~gen_build_costs["GENERATION_PROJECT"].str.contains(
+            "batter|storage", case=False
+        ),
         "gen_storage_energy_overnight_cost",
     ] = "."
 

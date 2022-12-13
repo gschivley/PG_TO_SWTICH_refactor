@@ -162,6 +162,7 @@ def gen_projects_info_file(
     complete_gens: pd.DataFrame,
     settings: dict,
     out_folder: Path,
+    gen_buildpre: pd.DataFrame,
 ):
 
     if settings.get("cogen_tech"):
@@ -422,6 +423,20 @@ def gen_projects_info_file(
     non_fuel_energy_table.to_csv(
         out_folder / "non_fuel_energy_sources.csv", index=False
     )
+    # change the gen_capacity_limit_mw for those from gen_build_predetermined
+    gen_project_info_new = pd.merge(
+        gen_project_info, gen_buildpre, how="left", on="GENERATION_PROJECT"
+    )
+    gen_project_info_new.loc[
+        gen_project_info_new["gen_predetermined_cap"].notna(), "gen_capacity_limit_mw"
+    ] = gen_project_info_new[["gen_capacity_limit_mw", "gen_predetermined_cap"]].max(
+        axis=1
+    )
+    gen_project_info = gen_project_info_new.drop(
+        ["build_year", "gen_predetermined_cap", "gen_predetermined_storage_energy_mwh"],
+        axis=1,
+    )
+
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
 
 
@@ -622,7 +637,9 @@ def gen_prebuild_newbuild_info_files(
         subset=["Resource"]
     )
     complete_gens = add_misc_gen_values(complete_gens, settings)
-    gen_projects_info_file(gc.fuel_prices, complete_gens, gc.settings, out_folder)
+    gen_projects_info_file(
+        gc.fuel_prices, complete_gens, gc.settings, out_folder, gen_buildpre
+    )
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
