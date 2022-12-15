@@ -115,7 +115,7 @@ def fuel_files(
     )
     zone_regional_fm
     # creating dummy values based on one load zone in REAM's input file
-    # regional_fuel_market should align with the regional_fuel_market table
+    # note:regional_fuel_market should align with the regional_fuel_market table.
     fuel_supply_curves20 = pd.DataFrame(
         {
             "period": [2020, 2020, 2020, 2020, 2020, 2020],
@@ -435,6 +435,17 @@ def gen_projects_info_file(
     gen_project_info = gen_project_info_new.drop(
         ["build_year", "gen_predetermined_cap", "gen_predetermined_storage_energy_mwh"],
         axis=1,
+    )
+    # remove the duplicated GENERATION_PROJECT from generation_projects_info .csv, and aggregate the "gen_capacity_limit_mw"
+    gen_project_info["total_capacity"] = gen_project_info.groupby(
+        ["GENERATION_PROJECT"]
+    )["gen_capacity_limit_mw"].transform("sum")
+    gen_project_info = gen_project_info.drop(
+        ["gen_capacity_limit_mw"],
+        axis=1,
+    )
+    gen_project_info.rename(
+        columns={"total_capacity": "gen_capacity_limit_mw"}, inplace=True
     )
 
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)

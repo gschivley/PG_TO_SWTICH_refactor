@@ -439,10 +439,7 @@ def gen_build_predetermined(
         },
         inplace=True,
     )
-<<<<<<< HEAD
-=======
 
->>>>>>> 8964179 (change hydro_project column of hydro_timeseries)
     gen_buildpre["build_year"] = gen_buildpre["build_year"].astype("Int64")
     gen_buildpre = gen_buildpre.groupby(
         ["GENERATION_PROJECT", "build_year"],
@@ -956,7 +953,7 @@ def fuel_market_tables(fuel_prices, aeo_fuel_region_map, scenario):
 
     fuel_markets = reg_fuel_mar_1["regional_fuel_market"].unique()
 
-    # region to fuel
+    # from region to fuel
     group = reg_fuel_mar_1.groupby("regional_fuel_market")
     fuel_market_dict = {}
     for region in fuel_markets:

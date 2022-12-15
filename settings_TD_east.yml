@@ -371,51 +371,51 @@ small_hydro_regions:
 model_regions:
   # - ERC_REST
   # - ERC_PHDL_WEST
-  # - FRCC
-  # - MIS_AMSO
-  # - MIS_AR
-  # - MIS_D_MS
-  # - MIS_IA
-  # - MIS_IL
-  # - MIS_INKY
-  # - MIS_LA
-  # - MIS_LMI
-  # - MIS_MAPP
-  # - MIS_MIDA
-  # - MIS_MNWI
-  # - MIS_MO
-  # - MIS_WOTA
-  # - MIS_WUMS
+  - FRCC
+  - MIS_AMSO
+  - MIS_AR
+  - MIS_D_MS
+  - MIS_IA
+  - MIS_IL
+  - MIS_INKY
+  - MIS_LA
+  - MIS_LMI
+  - MIS_MAPP
+  - MIS_MIDA
+  - MIS_MNWI
+  - MIS_MO
+  - MIS_WOTA
+  - MIS_WUMS
   - NENG_CT
   - NENG_ME
   - NENGREST
-  # - NY_Z_A
-  # - NY_Z_B
-  # - NY_Z_C&E
-  # - NY_Z_D
-  # - NY_Z_F
-  # - NY_Z_G-I
-  # - NY_Z_J
-  # - NY_Z_K
-  # - PJM_AP
-  # - PJM_ATSI
-  # - PJM_COMD
-  # - PJM_Dom
-  # - PJM_EMAC
-  # - PJM_PENE
-  # - PJM_SMAC  
-  # - PJM_West
-  # - PJM_WMAC
-  # - S_C_KY
-  # - S_C_TVA
-  # - S_D_AECI
-  # - S_SOU
-  # - S_VACA
-  # - SPP_N
-  # - SPP_NEBR
-  # - SPP_SPS
-  # - SPP_WAUE
-  # - SPP_WEST
+  - NY_Z_A
+  - NY_Z_B
+  - NY_Z_C&E
+  - NY_Z_D
+  - NY_Z_F
+  - NY_Z_G-I
+  - NY_Z_J
+  - NY_Z_K
+  - PJM_AP
+  - PJM_ATSI
+  - PJM_COMD
+  - PJM_Dom
+  - PJM_EMAC
+  - PJM_PENE
+  - PJM_SMAC  
+  - PJM_West
+  - PJM_WMAC
+  - S_C_KY
+  - S_C_TVA
+  - S_D_AECI
+  - S_SOU
+  - S_VACA
+  - SPP_N
+  - SPP_NEBR
+  - SPP_SPS
+  - SPP_WAUE
+  - SPP_WEST
   # - WEC_BANC
   # - WEC_CALN
   # - WEC_LADW
