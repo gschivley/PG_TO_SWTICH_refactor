@@ -797,7 +797,7 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
     # List of hydro technologies in technology column from existing gen
     hydro_list = [
         "Conventional Hydroelectric",
-        "Hydroelectric Pumped Storage",
+        # "Hydroelectric Pumped Storage",
         "Small Hydroelectric",
     ]
 

@@ -447,7 +447,7 @@ def gen_projects_info_file(
     gen_project_info.rename(
         columns={"total_capacity": "gen_capacity_limit_mw"}, inplace=True
     )
-
+    gen_project_info = gen_project_info.drop_duplicates(subset="GENERATION_PROJECT")
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
 
 
