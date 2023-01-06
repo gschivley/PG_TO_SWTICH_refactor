@@ -85,7 +85,7 @@ num_clusters:
   # Solar Thermal without Energy Storage: 1 # Ignored due to limited size
   Onshore Wind Turbine: 1
   Offshore Wind Turbine: 1
-  # Petroleum Liquids: 1
+  Petroleum Liquids: 1
   # Petroleum Coke: 1 # Ignored in due to limited capacity
   # Wood/Wood Waste Biomass: 1 # Aggregated into Biomass
   # Landfill Gas: 1 # Aggregated into Biomass

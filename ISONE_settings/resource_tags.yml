@@ -104,6 +104,7 @@ model_tag_values:
     NaturalGas_: 1 # Candidates
     AdvNuclear_: 1 # Candidates
     Hydrogen_: 1 # Candidates
+    Coal_CCS90AvgCF: 1
   VRE:
     Geothermal: 1
     Onshore Wind Turbine: 1
