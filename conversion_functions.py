@@ -3,10 +3,13 @@ Functions to convert data from PowerGenome for use with Switch
 """
 
 from statistics import mean, mode
+from typing import List
 
 import numpy as np
 import pandas as pd
 import math
+
+from powergenome.time_reduction import kmeans_time_clustering
 
 
 def switch_fuel_cost_table(
@@ -983,6 +986,126 @@ def fuel_market_tables(fuel_prices, aeo_fuel_region_map, scenario):
     regional_fuel_markets = regional_fuel_markets[["regional_fuel_market", "fuel"]]
 
     return regional_fuel_markets, zone_regional_fm
+
+
+def ts_tp_pg_kmeans(
+    representative_point: pd.DataFrame,
+    point_weights: List[int],
+    days_per_period: int,
+    planning_periods: List[int],
+    planning_period_start_years: List[int],
+):
+    ts_data = {
+        "timeseries": [],
+        "ts_period": [],
+        "ts_duration_of_tp": [],
+        "ts_num_tps": [],
+        "ts_scale_to_period": [],
+    }
+    tp_data = {
+        "timestamp": [],
+        "timeseries": [],
+    }
+    for yr, start_yr in zip(planning_periods, planning_period_start_years):
+        planning_yrs = yr - start_yr
+        for p, weight in zip(representative_point, point_weights):
+            num_hours = days_per_period * 24
+            ts = f"{yr}_{p}"
+            ts_data["timeseries"].append(ts)
+            ts_data["ts_period"].append(yr)
+            ts_data["ts_duration_of_tp"].append(1)
+            ts_data["ts_num_tps"].append(num_hours)
+            ts_data["ts_scale_to_period"].append(weight * num_hours * planning_yrs)
+
+            tp_data["timestamp"].extend([f"{ts}_{i}" for i in range(num_hours)])
+            tp_data["timeseries"].extend([ts for i in range(num_hours)])
+
+    timeseries = pd.DataFrame(ts_data)
+    timepoints = pd.DataFrame(tp_data)
+    timepoints["timepoint_id"] = timepoints.index + 1
+
+    return timeseries, timepoints
+
+
+def hydro_timepoints_pg_kmeans(timepoints: pd.DataFrame) -> pd.DataFrame:
+
+    hydro_timepoints = timepoints.copy()
+    hydro_timepoints = hydro_timepoints.rename(columns={"timeseries": "tp_to_hts"})
+
+    return hydro_timepoints[["timepoint_id", "tp_to_hts"]]
+
+
+def hydro_timeseries_pg_kmeans(
+    existing_gen,
+    hydro_variability,
+    hydro_timepoints: pd.DataFrame,
+    outage_rate: float = 0.05,
+):
+
+    hydro_df = existing_gen.copy()
+    hydro_df["min_cap_mw"] = hydro_df["Existing_Cap_MW"] * hydro_df["Min_Power"]
+    hydro_df = hydro_df.loc[hydro_df["HYDRO"] == 1, :]
+
+    hydro_variability = hydro_variability.loc[:, hydro_df["Resource"]]
+
+    for col in hydro_variability.columns:
+        hydro_variability[col] *= hydro_df.loc[
+            hydro_df["Resource"] == col, "Existing_Cap_MW"
+        ].values[0]
+
+    length_ratio = int(len(hydro_timepoints) / len(hydro_variability))
+    hydro_variability = pd.concat([hydro_variability] * length_ratio, ignore_index=True)
+    assert len(hydro_variability) == len(hydro_timepoints)
+    hydro_variability["timeseries"] = hydro_timepoints["tp_to_hts"].values
+    hydro_ts = hydro_variability.melt(id_vars=["timeseries"])
+    hydro_ts["hydro_avg_flow_mw"] = hydro_ts.groupby("timeseries")["value"].transform(
+        "mean"
+    )
+
+    hydro_ts["hydro_min_flow_mw"] = hydro_ts["Resource"].map(
+        hydro_df.set_index("Resource")["min_cap_mw"]
+    )
+
+    hydro_ts["outage_rate"] = outage_rate
+    hydro_ts = hydro_ts.rename(columns={"Resource": "hydro_project"})
+    cols = [
+        "hydro_project",
+        "timeseries",
+        "outage_rate",
+        "hydro_min_flow_mw",
+        "hydro_avg_flow_mw",
+    ]
+    return hydro_ts[cols]
+
+
+def variable_cf_pg_kmeans(all_gen_variability, timepoints):
+
+    vre_gens = all_gen_variability.columns[all_gen_variability.mean() < 1]
+    vre_variability = all_gen_variability[vre_gens]
+    length_ratio = int(len(timepoints) / len(all_gen_variability))
+    vre_variability = pd.concat([vre_variability] * length_ratio, ignore_index=True)
+    assert len(vre_variability) == len(timepoints)
+    vre_variability["timepoint_id"] = timepoints["timepoint_id"].values
+    vre_ts = vre_variability.melt(
+        id_vars=["timepoint_id"], value_name="gen_max_capacity_factor"
+    )
+    vre_ts = vre_ts.rename(
+        columns={"Resource": "GENERATION_PROJECT", "timepoint_id": "timepoint"}
+    )
+
+    return vre_ts
+
+
+def load_pg_kmeans(load_curves, timepoints):
+    load_curves = load_curves.astype(int)
+    length_ratio = int(len(timepoints) / len(load_curves))
+    load_curves = pd.concat([load_curves] * length_ratio, ignore_index=True)
+    assert len(load_curves) == len(timepoints)
+    load_curves["TIMEPOINT"] = timepoints["timepoint_id"].values
+    load_ts = load_curves.melt(id_vars=["TIMEPOINT"], value_name="zone_demand_mw")
+    load_ts = load_ts.rename(columns={"region": "LOAD_ZONE"})
+
+    return load_ts
 
 
 def timeseries(

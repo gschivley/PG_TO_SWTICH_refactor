@@ -23,6 +23,7 @@ from powergenome.util import (
     load_settings,
     check_settings,
 )
+from powergenome.time_reduction import kmeans_time_clustering
 from powergenome.eia_opendata import fetch_fuel_prices
 import geopandas as gpd
 from powergenome.generators import *
@@ -54,6 +55,11 @@ from conversion_functions import (
     variable_capacity_factors_table,
     transmission_lines_table,
     balancing_areas,
+    ts_tp_pg_kmeans,
+    hydro_timepoints_pg_kmeans,
+    hydro_timeseries_pg_kmeans,
+    variable_cf_pg_kmeans,
+    load_pg_kmeans,
 )
 
 from powergenome.load_profiles import (
@@ -613,6 +619,8 @@ def gen_prebuild_newbuild_info_files(
 
     # newbuild options
     df_list = []
+    planning_periods = []
+    planning_period_start_yrs = []
     for settings in settings_list:
         gc.settings = settings
         new_gen = gc.create_new_generators()
@@ -623,6 +631,8 @@ def gen_prebuild_newbuild_info_files(
             "Resource"
         ]  # + f"_{settings['model_year']}"
         df_list.append(new_gen)
+        planning_periods.append(settings["model_year"])
+        planning_period_start_yrs.append(settings["model_first_planning_year"])
 
     newgens = pd.concat(df_list, ignore_index=True)
 
@@ -654,6 +664,51 @@ def gen_prebuild_newbuild_info_files(
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
+    all_gen_variability = make_generator_variability(all_gen)
+    all_gen_variability.columns = all_gen["Resource"]
+
+    if settings.get("reduce_time_domain") is True:
+        for p in ["time_domain_periods", "time_domain_days_per_period"]:
+            assert p in settings.keys()
+
+        # results is a dict with keys "resource_profiles" (gen_variability), "load_profiles",
+        # "time_series_mapping" (maps clusters sequentially to potential periods in year),
+        # "ClusterWeights", etc. See PG for full details.
+        results, representative_point, weights = kmeans_time_clustering(
+            resource_profiles=all_gen_variability,
+            load_profiles=load_curves,
+            days_in_group=settings["time_domain_days_per_period"],
+            num_clusters=settings["time_domain_periods"],
+            include_peak_day=settings.get("include_peak_day", True),
+            load_weight=settings.get("demand_weight_factor", 1),
+            variable_resources_only=settings.get("variable_resources_only", True),
+        )
+
+        load_curves = results["load_profiles"]
+        all_gen_variability = results["resource_profiles"]
+
+        timeseries_df, timepoints_df = ts_tp_pg_kmeans(
+            representative_point["slot"],
+            weights,
+            settings["time_domain_days_per_period"],
+            planning_periods,
+            planning_period_start_yrs,
+        )
+        hydro_timepoints_df = hydro_timepoints_pg_kmeans(timepoints_df)
+        hydro_timeseries_table = hydro_timeseries_pg_kmeans(
+            existing_gen,
+            all_gen_variability.loc[
+                :, existing_gen.loc[existing_gen["HYDRO"] == 1, "Resource"]
+            ],
+            hydro_timepoints_df,
+        )
+
+        vcf = variable_cf_pg_kmeans(
+            all_gen_variability, timepoints_df
+        )
+
+        loads = load_pg_kmeans(load_curves, timepoints_df)
+
     timeseries_df = timeseries(
         load_curves,
         max_weight=20.2778,
@@ -698,7 +753,7 @@ def gen_prebuild_newbuild_info_files(
     loads = loads.append(dummy_df)
 
     year_hour = loads_with_year_hour["year_hour"].to_list()
-    all_gen_variability = make_generator_variability(all_gen)
+
     vcf = variable_capacity_factors_table(
         all_gen_variability, year_hour, timepoints_dict, all_gen
     )
