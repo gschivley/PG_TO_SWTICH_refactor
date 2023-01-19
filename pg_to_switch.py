@@ -47,7 +47,6 @@ from conversion_functions import (
     load_zones_table,
     fuel_market_tables,
     timeseries,
-    timepoints_table,
     hydro_timepoints_table,
     graph_timestamp_map_table,
     loads_table,
@@ -116,6 +115,7 @@ def fuel_files(
     zone_regional_fm
     # creating dummy values based on one load zone in REAM's input file
     # note:regional_fuel_market should align with the regional_fuel_market table.
+    # TODO --RR
     fuel_supply_curves20 = pd.DataFrame(
         {
             "period": [2020, 2020, 2020, 2020, 2020, 2020],
@@ -455,6 +455,7 @@ def gen_prebuild_newbuild_info_files(
     gc: GeneratorClusters,
     pudl_engine: sa.engine,
     settings_list: List[dict],
+    case_years: List,
     out_folder: Path,
     pg_engine: sa.engine,
     hydro_variability_new: pd.DataFrame,
@@ -654,23 +655,16 @@ def gen_prebuild_newbuild_info_files(
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
-    timeseries_df = timeseries(
+    timeseries_df, timepoints_df, timestamp_interval= timeseries(
         load_curves,
+        case_years,
         max_weight=20.2778,
         avg_weight=283.8889,
         ts_duration_of_tp=4,
         ts_num_tps=6,
+        settings=settings,
     )
-    timeseries_dates = timeseries_df["timeseries"].to_list()
-    timestamp_interval = [
-        "00",
-        "04",
-        "08",
-        "12",
-        "16",
-        "20",
-    ]  # should align with ts_duration_of_tp and ts_num_tps
-    timepoints_df = timepoints_table(timeseries_dates, timestamp_interval)
+
     # create lists and dictionary for later use
     timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
     timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
@@ -700,7 +694,7 @@ def gen_prebuild_newbuild_info_files(
     year_hour = loads_with_year_hour["year_hour"].to_list()
     all_gen_variability = make_generator_variability(all_gen)
     vcf = variable_capacity_factors_table(
-        all_gen_variability, year_hour, timepoints_dict, all_gen
+        all_gen_variability, year_hour, timepoints_dict, all_gen, case_years
     )
 
     balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
@@ -938,6 +932,7 @@ def main(settings_file: str, results_folder: str):
             gc,
             pudl_engine,
             settings_list,
+            case_years,
             case_folder,
             pg_engine,
             hydro_variability_new,

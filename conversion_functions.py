@@ -793,8 +793,259 @@ def match_hydro_forced_outage_tech(x):
             return hydro_forced_outage_tech[key]
 
 
-def hydro_timeseries(existing_gen, hydro_variability, period_list):
-    # List of hydro technologies in technology column from existing gen
+def fuel_market_tables(fuel_prices, aeo_fuel_region_map, scenario):
+    """
+    Create regional_fuel_markets and zone_to_regional_fuel_market
+    SWITCH does not seem to like this overlapping with fuel_cost. So all of this might be incorrect.
+    """
+
+    # create initial regional fuel market.  Format: region - fuel
+    reg_fuel_mar_1 = fuel_prices.copy()
+    reg_fuel_mar_1 = reg_fuel_mar_1.loc[
+        reg_fuel_mar_1["scenario"] == scenario
+    ]  # use reference for now
+    reg_fuel_mar_1 = reg_fuel_mar_1.drop(
+        ["year", "price", "full_fuel_name", "scenario"], axis=1
+    )
+    reg_fuel_mar_1 = reg_fuel_mar_1.rename(columns={"region": "regional_fuel_market"})
+    reg_fuel_mar_1 = reg_fuel_mar_1[["regional_fuel_market", "fuel"]]
+
+    fuel_markets = reg_fuel_mar_1["regional_fuel_market"].unique()
+
+    # from region to fuel
+    group = reg_fuel_mar_1.groupby("regional_fuel_market")
+    fuel_market_dict = {}
+    for region in fuel_markets:
+        df = group.get_group(region)
+        fuel = df["fuel"].to_list()
+        fuel = list(set(fuel))
+        fuel_market_dict[region] = fuel
+
+    # create zone_regional_fuel_market
+    data = list()
+    for region in aeo_fuel_region_map.keys():
+        for i in range(len(aeo_fuel_region_map[region])):
+            ipm = aeo_fuel_region_map[region][i]
+            for fuel in fuel_market_dict[region]:
+                data.append([ipm, ipm + "-" + fuel])
+
+    zone_regional_fm = pd.DataFrame(data, columns=["load_zone", "regional_fuel_market"])
+
+    # use that to finish regional_fuel_markets
+    regional_fuel_markets = zone_regional_fm.copy()
+    regional_fuel_markets["fuel_list"] = regional_fuel_markets[
+        "regional_fuel_market"
+    ].str.split("-")
+    regional_fuel_markets["fuel"] = regional_fuel_markets["fuel_list"].apply(
+        lambda x: x[-1]
+    )
+    regional_fuel_markets = regional_fuel_markets[["regional_fuel_market", "fuel"]]
+
+    return regional_fuel_markets, zone_regional_fm
+
+
+def timeseries(
+    load_curves,
+    case_years,
+    settings,
+):  # 20.2778, 283.8889
+    """
+    Create the timeseries table based on REAM Scenario 178
+    Input:
+        1) load_curves: created using PowerGenome make(final_load_curves(pg_engine, scenario_settings[][]))
+        2) max_weight: the weight to apply to the days with highest values
+        3) avg_weight: the weight to apply to the days with average value
+        3) ts_duration_of_tp: how many hours should the timpoint last
+        4) ts_num_tps: number of timpoints in the selected day
+    Output columns:
+        - TIMESERIES: format: yyyy_yyyy-mm-dd
+        - ts_period: the period decade
+        - ts_duration_of_tp: based on input value
+        - ts_num_tps: based on input value. Should multiply to 24 with ts_duration_of_tp
+        - ts_scale_to_period: use the max&avg_weights for the average and max days in a month
+    """
+    if settings.get("sample_dates_fn") and settings.get("input_folder"):
+        sample_dates = pd.read_csv(
+            settings.get("input_folder") / settings["sample_dates_fn"]
+        )
+    else:
+        sample_year = min(case_years)
+        sample_year_start = str(sample_year) + "0101"
+        sample_year_end = str(sample_year) + "1231"
+        sample_dates = [
+            d.strftime("%Y%m%d")
+            for d in pd.date_range(sample_year_start, sample_year_end)
+        ]
+
+    leap_yr = str(sample_year) + "0229"
+    if leap_yr in sample_dates:
+        sample_dates.remove(leap_yr)  ### why remove Feb 29th? --RR
+
+    hr_load_sum = pd.DataFrame(load_curves.sum(axis=1), columns=["sum_across_regions"])
+    load_hrs = len(load_curves.index)  # number of hours PG outputs data for in a year
+    baseyear_hours = len(sample_dates) * 24
+    hr_interval = round(load_hrs / baseyear_hours)
+    # hr_int_list = list(range(1, int(24 / hr_interval) + 1))
+    hr_interval_load_sum = hr_load_sum.groupby(hr_load_sum.index // hr_interval).sum()
+    # create initial date list for 2020
+    timestamp = list()
+    for d in range(len(sample_dates)):
+        for i in range(1, 25):
+            date_hr = sample_dates[d]
+            timestamp.append(date_hr)
+
+    timeseries = [x[:4] + "_" + x[:4] + "-" + x[4:6] + "-" + x[6:8] for x in timestamp]
+    ts_period = [x[:4] for x in timestamp]
+    timepoint_id = list(range(len(timestamp)))
+
+    column_list = ["timeseries", "ts_period"]
+    data = np.array([timeseries, ts_period]).T
+    initial_df = pd.DataFrame(
+        data, columns=column_list, index=hr_interval_load_sum.index
+    )
+    initial_df = initial_df.join(hr_interval_load_sum)
+
+    if settings.get("chunk_days"):
+        chunk_days = settings.get("chunk_days")
+        # split dataframe into chunks of representative_days
+        chunk_hr = chunk_days * 24
+        n_chunks = len(sample_dates) // chunk_days
+        chunk_df = []
+        for i in range(len(n_chunks) - 1):
+            ck_df = (
+                (initial_df.iloc[i * chunk_hr : (i + 1) * chunk_hr, :])
+                .groupby("timeseries")
+                .sum()
+            )
+            chunk_df.append(ck_df)
+    else:
+        month_hrs = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
+        year_cumul = [
+            744,
+            1416,
+            2160,
+            2880,
+            3624,
+            4344,
+            5088,
+            5832,
+            6552,
+            7296,
+            8016,
+            8760,
+        ]  # cumulative hours by month
+
+        # split dataframe into months (grouped by day)
+        chunk_df = []
+        chunk_df.append(
+            (initial_df.iloc[0 : year_cumul[0], :]).groupby("timeseries").sum()
+        )
+        for i in range(len(year_cumul) - 1):
+            M_df = (
+                (initial_df.iloc[year_cumul[i] : year_cumul[i + 1], :])
+                .groupby("timeseries")
+                .sum()
+            )
+            chunk_df.append(M_df)
+
+    # find mean and max for each month, add date to a dataframe
+    timeseries_df = pd.DataFrame(
+        columns=["sum_across_regions", "timeseries", "close_to_mean"]
+    )
+    for df in chunk_df:
+        df["timeseries"] = df.index
+        mean = df["sum_across_regions"].mean()
+        df["close_to_mean"] = abs(df["sum_across_regions"] - mean)
+        df_mean = df.loc[df["close_to_mean"] == df["close_to_mean"].min()]
+        df_max = df.loc[df["sum_across_regions"] == df["sum_across_regions"].max()]
+        timeseries_df = timeseries_df.append(df_max)
+        timeseries_df = timeseries_df.append(df_mean)
+        timeseries_df["timeseries"] = timeseries_df.index
+
+    # add in other columns
+    timeseries_df["ts_period"] = str(sample_year)
+    ts_duration_of_tp = settings.get("ts_duration_of_tp")
+    ts_num_tps = settings.get("ts_num_tps")
+    timeseries_df["ts_duration_of_tp"] = ts_duration_of_tp  # assuming 4 for now
+    timeseries_df["ts_num_tps"] = ts_num_tps  # assuming 6 for now
+    timeseries_df = timeseries_df.reset_index(drop=True)
+    timeseries_df = timeseries_df.drop(["sum_across_regions"], axis=1)
+
+    timeseries_df["ts_scale_to_period"] = None
+
+    planning_years = settings.get("planning_years")
+    max_days = settings.get("max_days")
+    sample_to_year_ratio = round(8760 / (len(sample_dates) * 24), 3)
+    max_weight = planning_years * max_days * sample_to_year_ratio
+    avg_weight = planning_years * (chunk_days - max_days) * sample_to_year_ratio
+
+    for i in range(len(timeseries_df)):
+        if i % 2 == 0:
+            timeseries_df.loc[i, "ts_scale_to_period"] = max_weight
+    timeseries_df["ts_scale_to_period"].replace(
+        to_replace=[None], value=avg_weight, inplace=True
+    )
+
+    # add in addtional years (just replace 2020 with new year)
+    addtl_yrs = case_years
+    addtl_yrs.remove(sample_year)
+    addtl_df = pd.DataFrame(columns=timeseries_df.columns)
+    for y in addtl_yrs:
+        df = timeseries_df.copy()
+        df["ts_period"] = str(y)
+        col1 = df["timeseries"].to_list()
+        col1 = [str(y) + "_" + str(y) + x[9:] for x in col1]
+        df["timeseries"] = col1
+        addtl_df = addtl_df.append(df)
+    timeseries_df = timeseries_df.append(addtl_df)
+    timeseries_df = timeseries_df[
+        [
+            "timeseries",
+            "ts_period",
+            "ts_duration_of_tp",
+            "ts_num_tps",
+            "ts_scale_to_period",
+        ]
+    ]
+
+    timeseries_dates = timeseries_df["timeseries"].to_list()
+    timestamp_interval = list()
+    for i in range(ts_num_tps):
+        s_interval = ts_duration_of_tp * i
+        stamp_interval = str(f"{s_interval:02d}")
+        timestamp_interval.append(stamp_interval)
+
+    timepoint_id = list(range(1, len(timeseries_dates) + 1))
+    timestamp = [x[:4] + x[10:12] + x[13:] for x in timeseries_dates]
+
+    column_list = ["timepoint_id", "timestamp", "timeseries"]
+    timepoints_df = pd.DataFrame(columns=column_list)
+    for i in timestamp_interval:
+        timestamp_interval = [x + i for x in timestamp]
+        df_data = np.array([timepoint_id, timestamp_interval, timeseries_dates]).T
+        df = pd.DataFrame(df_data, columns=column_list)
+        timepoints_df = timepoints_df.append(df)
+
+    timepoints_df["timepoint_id"] = range(
+        1, len(timepoints_df["timeseries"].to_list()) + 1
+    )
+
+    return timeseries_df, timepoints_df, timestamp_interval
+
+
+def hydro_time_tables(existing_gen, hydro_variability, period_list, timepoints_df):
+    """
+    Create the hydro_timepoints table based on REAM Scenario 178
+    Inputs:
+        1) timepoints_df: the SWITCH timepoints table
+    Output Columns
+        * timepoint_id: from the timepoints table
+        * tp_to_hts: format: yyyy_M#. Based on the timestamp date from the timepoints table
+    """
+
+    hydro_timepoints = timepoints_df
+    hydro_timepoints = hydro_timepoints.rename(columns={"timeseries": "tp_to_hts"})
+
     hydro_list = [
         "Conventional Hydroelectric",
         # "Hydroelectric Pumped Storage",
@@ -857,34 +1108,12 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
     ]  # cumulative hours by month
 
     # split dataframe into months
-    M1_df = hydro_transpose.iloc[:, 0 : year_cumul[0]]
-    M2_df = hydro_transpose.iloc[:, year_cumul[0] : year_cumul[1]]
-    M3_df = hydro_transpose.iloc[:, year_cumul[1] : year_cumul[2]]
-    M4_df = hydro_transpose.iloc[:, year_cumul[2] : year_cumul[3]]
-    M5_df = hydro_transpose.iloc[:, year_cumul[3] : year_cumul[4]]
-    M6_df = hydro_transpose.iloc[:, year_cumul[4] : year_cumul[5]]
-    M7_df = hydro_transpose.iloc[:, year_cumul[5] : year_cumul[6]]
-    M8_df = hydro_transpose.iloc[:, year_cumul[6] : year_cumul[7]]
-    M9_df = hydro_transpose.iloc[:, year_cumul[7] : year_cumul[8]]
-    M10_df = hydro_transpose.iloc[:, year_cumul[8] : year_cumul[9]]
-    M11_df = hydro_transpose.iloc[:, year_cumul[9] : year_cumul[10]]
-    M12_df = hydro_transpose.iloc[:, year_cumul[10] : year_cumul[11]]
+    month_df = []
+    month_df.append((hydro_transpose.iloc[:, 0 : year_cumul[0]]))
+    for i in range(len(year_cumul) - 1):
+        M_df = hydro_transpose.iloc[:, year_cumul[i] : year_cumul[i + 1]]
+        month_df.append(M_df)
 
-    # get min and average for each month
-    month_df = [
-        M1_df,
-        M2_df,
-        M3_df,
-        M4_df,
-        M5_df,
-        M6_df,
-        M7_df,
-        M8_df,
-        M9_df,
-        M10_df,
-        M11_df,
-        M12_df,
-    ]
     month_names = [
         "M1",
         "M2",
@@ -925,297 +1154,13 @@ def hydro_timeseries(existing_gen, hydro_variability, period_list):
         df2 = hydro_final.copy()
         df2["timeseries"] = decade + "_" + df2["timeseries"]
         timeseries_list.append(df2)
-    hydro_final_df = pd.concat(timeseries_list, axis=0)
+
+    hydro_timeseries = pd.concat(timeseries_list, axis=0)
 
     # hydro_final_df = hydro_final_df.drop(
     #     columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
     # )
-
-    return hydro_final_df
-
-
-def fuel_market_tables(fuel_prices, aeo_fuel_region_map, scenario):
-    """
-    Create regional_fuel_markets and zone_to_regional_fuel_market
-    SWITCH does not seem to like this overlapping with fuel_cost. So all of this might be incorrect.
-    """
-
-    # create initial regional fuel market.  Format: region - fuel
-    reg_fuel_mar_1 = fuel_prices.copy()
-    reg_fuel_mar_1 = reg_fuel_mar_1.loc[
-        reg_fuel_mar_1["scenario"] == scenario
-    ]  # use reference for now
-    reg_fuel_mar_1 = reg_fuel_mar_1.drop(
-        ["year", "price", "full_fuel_name", "scenario"], axis=1
-    )
-    reg_fuel_mar_1 = reg_fuel_mar_1.rename(columns={"region": "regional_fuel_market"})
-    reg_fuel_mar_1 = reg_fuel_mar_1[["regional_fuel_market", "fuel"]]
-
-    fuel_markets = reg_fuel_mar_1["regional_fuel_market"].unique()
-
-    # from region to fuel
-    group = reg_fuel_mar_1.groupby("regional_fuel_market")
-    fuel_market_dict = {}
-    for region in fuel_markets:
-        df = group.get_group(region)
-        fuel = df["fuel"].to_list()
-        fuel = list(set(fuel))
-        fuel_market_dict[region] = fuel
-
-    # create zone_regional_fuel_market
-    data = list()
-    for region in aeo_fuel_region_map.keys():
-        for i in range(len(aeo_fuel_region_map[region])):
-            ipm = aeo_fuel_region_map[region][i]
-            for fuel in fuel_market_dict[region]:
-                data.append([ipm, ipm + "-" + fuel])
-
-    zone_regional_fm = pd.DataFrame(data, columns=["load_zone", "regional_fuel_market"])
-
-    # use that to finish regional_fuel_markets
-    regional_fuel_markets = zone_regional_fm.copy()
-    regional_fuel_markets["fuel_list"] = regional_fuel_markets[
-        "regional_fuel_market"
-    ].str.split("-")
-    regional_fuel_markets["fuel"] = regional_fuel_markets["fuel_list"].apply(
-        lambda x: x[-1]
-    )
-    regional_fuel_markets = regional_fuel_markets[["regional_fuel_market", "fuel"]]
-
-    return regional_fuel_markets, zone_regional_fm
-
-
-def timeseries(
-    load_curves, max_weight, avg_weight, ts_duration_of_tp, ts_num_tps
-):  # 20.2778, 283.8889
-    """
-    Create the timeseries table based on REAM Scenario 178
-    Input:
-        1) load_curves: created using PowerGenome make(final_load_curves(pg_engine, scenario_settings[][]))
-        2) max_weight: the weight to apply to the days with highest values
-        3) avg_weight: the weight to apply to the days with average value
-        3) ts_duration_of_tp: how many hours should the timpoint last
-        4) ts_num_tps: number of timpoints in the selected day
-    Output columns:
-        - TIMESERIES: format: yyyy_yyyy-mm-dd
-        - ts_period: the period decade
-        - ts_duration_of_tp: based on input value
-        - ts_num_tps: based on input value. Should multiply to 24 with ts_duration_of_tp
-        - ts_scale_to_period: use the max&avg_weights for the average and max days in a month
-    """
-    hr_load_sum = pd.DataFrame(load_curves.sum(axis=1), columns=["sum_across_regions"])
-    num_hrs = len(load_curves.index)  # number of hours PG outputs data for in a year
-    hr_interval = round(num_hrs / 8760)
-    hr_int_list = list(range(1, int(24 / hr_interval) + 1))
-
-    yr_dates = [d.strftime("%Y%m%d") for d in pd.date_range("20200101", "20201231")]
-    leap_yr = "20200229"
-    yr_dates.remove(leap_yr)
-
-    # create initial date list for 2020
-    timestamp = list()
-    for d in range(len(yr_dates)):
-        for i in hr_int_list:
-            date_hr = yr_dates[d]
-            timestamp.append(date_hr)
-
-    timeseries = [x[:4] + "_" + x[:4] + "-" + x[4:6] + "-" + x[6:8] for x in timestamp]
-    ts_period = [x[:4] for x in timestamp]
-    timepoint_id = list(range(len(timestamp)))
-
-    column_list = ["timeseries", "ts_period"]
-    data = np.array([timeseries, ts_period]).T
-    initial_df = pd.DataFrame(data, columns=column_list, index=hr_load_sum.index)
-    initial_df = initial_df.join(hr_load_sum)
-
-    month_hrs = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
-    year_cumul = [
-        744,
-        1416,
-        2160,
-        2880,
-        3624,
-        4344,
-        5088,
-        5832,
-        6552,
-        7296,
-        8016,
-        8760,
-    ]  # cumulative hours by month
-
-    # split dataframe into months (grouped by day)
-    M1_df = (initial_df.iloc[0 : year_cumul[0], :]).groupby("timeseries").sum()
-    M2_df = (
-        (initial_df.iloc[year_cumul[0] : year_cumul[1], :]).groupby("timeseries").sum()
-    )
-    M3_df = (
-        (initial_df.iloc[year_cumul[1] : year_cumul[2], :]).groupby("timeseries").sum()
-    )
-    M4_df = (
-        (initial_df.iloc[year_cumul[2] : year_cumul[3], :]).groupby("timeseries").sum()
-    )
-    M5_df = (
-        (initial_df.iloc[year_cumul[3] : year_cumul[4], :]).groupby("timeseries").sum()
-    )
-    M6_df = (
-        (initial_df.iloc[year_cumul[4] : year_cumul[5], :]).groupby("timeseries").sum()
-    )
-    M7_df = (
-        (initial_df.iloc[year_cumul[5] : year_cumul[6], :]).groupby("timeseries").sum()
-    )
-    M8_df = (
-        (initial_df.iloc[year_cumul[6] : year_cumul[7], :]).groupby("timeseries").sum()
-    )
-    M9_df = (
-        (initial_df.iloc[year_cumul[7] : year_cumul[8], :]).groupby("timeseries").sum()
-    )
-    M10_df = (
-        (initial_df.iloc[year_cumul[8] : year_cumul[9], :]).groupby("timeseries").sum()
-    )
-    M11_df = (
-        (initial_df.iloc[year_cumul[9] : year_cumul[10], :]).groupby("timeseries").sum()
-    )
-    M12_df = (
-        (initial_df.iloc[year_cumul[10] : year_cumul[11], :])
-        .groupby("timeseries")
-        .sum()
-    )
-
-    month_df = [
-        M1_df,
-        M2_df,
-        M3_df,
-        M4_df,
-        M5_df,
-        M6_df,
-        M7_df,
-        M8_df,
-        M9_df,
-        M10_df,
-        M11_df,
-        M12_df,
-    ]
-
-    # find mean and max for each month, add date to a dataframe
-    timeseries_df = pd.DataFrame(
-        columns=["sum_across_regions", "timeseries", "close_to_mean"]
-    )
-    for df in month_df:
-        df["timeseries"] = df.index
-        mean = df["sum_across_regions"].mean()
-        df["close_to_mean"] = abs(df["sum_across_regions"] - mean)
-        df_mean = df.loc[df["close_to_mean"] == df["close_to_mean"].min()]
-        df_max = df.loc[df["sum_across_regions"] == df["sum_across_regions"].max()]
-        timeseries_df = timeseries_df.append(df_max)
-        timeseries_df = timeseries_df.append(df_mean)
-        timeseries_df["timeseries"] = timeseries_df.index
-
-    # add in other columns
-    timeseries_df["ts_period"] = "2020"
-    timeseries_df["ts_duration_of_tp"] = ts_duration_of_tp  # assuming 4 for now
-    timeseries_df["ts_num_tps"] = ts_num_tps  # assuming 6 for now
-    timeseries_df = timeseries_df.reset_index(drop=True)
-    timeseries_df = timeseries_df.drop(["sum_across_regions"], axis=1)
-
-    timeseries_df["ts_scale_to_period"] = None
-
-    for i in range(len(timeseries_df)):
-        if i % 2 == 0:
-            timeseries_df.loc[i, "ts_scale_to_period"] = max_weight
-    timeseries_df["ts_scale_to_period"].replace(
-        to_replace=[None], value=avg_weight, inplace=True
-    )
-
-    # add in addtional years (just replace 2020 with new year)
-    addtl_yrs = ["2030", "2040", "2050"]
-    addtl_df = pd.DataFrame(columns=timeseries_df.columns)
-    for y in addtl_yrs:
-        df = timeseries_df.copy()
-        df["ts_period"] = y
-        col1 = df["timeseries"].to_list()
-        col1 = [y + "_" + y + x[9:] for x in col1]
-        df["timeseries"] = col1
-        addtl_df = addtl_df.append(df)
-    timeseries_df = timeseries_df.append(addtl_df)
-    timeseries_df = timeseries_df[
-        [
-            "timeseries",
-            "ts_period",
-            "ts_duration_of_tp",
-            "ts_num_tps",
-            "ts_scale_to_period",
-        ]
-    ]
-    return timeseries_df
-
-
-def timepoints_table(timeseries_dates, timestamp_interval):
-    """
-    Create the timepoints SWICH input file based on REAM Scenario 178
-    Inputs:
-        1) timeseries_dates: timeseries dates from the timeseries table
-        2) timestamp_interval: based on ts_duration_of_tp and ts_num_tps from the timeseries table.
-                Should be between 0 and 24.
-    Output columns:
-        * timepoints_id: ID
-        * timestamp: timeseries formatted yyymmddtt where tt is in the timestamp_inverval list
-        * timeseries: the timesries date from the timeseries table
-    """
-    timepoint_id = list(range(1, len(timeseries_dates) + 1))
-    timestamp = [x[:4] + x[10:12] + x[13:] for x in timeseries_dates]
-
-    column_list = ["timepoint_id", "timestamp", "timeseries"]
-    timepoints_df = pd.DataFrame(columns=column_list)
-    for i in timestamp_interval:
-        timestamp_interval = [x + i for x in timestamp]
-        df_data = np.array([timepoint_id, timestamp_interval, timeseries_dates]).T
-        df = pd.DataFrame(df_data, columns=column_list)
-        timepoints_df = timepoints_df.append(df)
-
-    timepoints_df["timepoint_id"] = range(
-        1, len(timepoints_df["timeseries"].to_list()) + 1
-    )
-
-    return timepoints_df
-
-
-def hydro_timepoints_table(timepoints_df):
-    """
-    Create the hydro_timepoints table based on REAM Scenario 178
-    Inputs:
-        1) timepoints_df: the SWITCH timepoints table
-    Output Columns
-        * timepoint_id: from the timepoints table
-        * tp_to_hts: format: yyyy_M#. Based on the timestamp date from the timepoints table
-    """
-
-    hydro_timepoints = timepoints_df
-    hydro_timepoints = hydro_timepoints[["timepoint_id", "timestamp"]]
-    convert_to_hts = {
-        "01": "_M1",
-        "02": "_M2",
-        "03": "_M3",
-        "04": "_M4",
-        "05": "_M5",
-        "06": "_M6",
-        "07": "_M7",
-        "08": "_M8",
-        "09": "_M9",
-        "10": "_M10",
-        "11": "_M11",
-        "12": "_M12",
-    }
-
-    def convert(tstamp):
-        month = tstamp[4:6]
-        year = tstamp[0:4]
-        return year + convert_to_hts[month]
-
-    hydro_timepoints["tp_to_hts"] = hydro_timepoints["timestamp"].apply(convert)
-    hydro_timepoints.drop("timestamp", axis=1, inplace=True)
-
-    return hydro_timepoints
+    return hydro_timepoints, hydro_timeseries
 
 
 def graph_timestamp_map_table(timeseries_df, timestamp_interval):
@@ -1323,7 +1268,7 @@ def loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
 
 
 def variable_capacity_factors_table(
-    all_gen_variability, year_hour, timepoints_dict, all_gen
+    all_gen_variability, year_hour, timepoints_dict, all_gen, case_years
 ):
     """
     Inputs
@@ -1359,30 +1304,18 @@ def variable_capacity_factors_table(
     date_list = mod_vcf["reformat"].to_list()
     # change 2021 to correct period year/decade
     # to get the timestamp
-    updated_dates20 = ["2020" + x[4:] for x in date_list]
-    updated_dates30 = ["2030" + x[4:] for x in date_list]
-    updated_dates40 = ["2040" + x[4:] for x in date_list]
-    updated_dates50 = ["2050" + x[4:] for x in date_list]
-    mod_vcf1 = mod_vcf.copy()
-    mod_vcf2 = mod_vcf.copy()
-    mod_vcf3 = mod_vcf.copy()
-    mod_vcf4 = mod_vcf.copy()
-    mod_vcf1["timestamp"] = updated_dates20
-    mod_vcf2["timestamp"] = updated_dates30
-    mod_vcf3["timestamp"] = updated_dates40
-    mod_vcf4["timestamp"] = updated_dates50
-    # go from timestamp to timepoint
-    mod_vcf1["timepoint"] = mod_vcf1["timestamp"].apply(lambda x: timepoints_dict[x])
-    mod_vcf2["timepoint"] = mod_vcf2["timestamp"].apply(lambda x: timepoints_dict[x])
-    mod_vcf3["timepoint"] = mod_vcf3["timestamp"].apply(lambda x: timepoints_dict[x])
-    mod_vcf4["timepoint"] = mod_vcf4["timestamp"].apply(lambda x: timepoints_dict[x])
-    # get final columns
-    mod_vcf1.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
-    mod_vcf2.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
-    mod_vcf3.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
-    mod_vcf4.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
-    # bring all decades together
-    var_cap_fac = pd.concat([mod_vcf1, mod_vcf2, mod_vcf3, mod_vcf4], ignore_index=True)
+    var_cap_fac = pd.DataFrame()
+    for i in case_years:
+        updated_dates = [str(i) + x[4:] for x in date_list]
+        mod_vcf_copy = mod_vcf.copy()
+        mod_vcf_copy["timestamp"] = updated_dates
+        mod_vcf_copy["timepoint"] = mod_vcf_copy["timestamp"].apply(
+            lambda x: timepoints_dict[x]
+        )
+        mod_vcf_copy.drop(
+            ["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True
+        )
+        var_cap_fac = pd.concat([var_cap_fac, mod_vcf_copy], ignore_index=True)
 
     # only get all_gen plants that are wind or solar
     technology = all_gen["technology"].to_list()
@@ -1399,29 +1332,6 @@ def variable_capacity_factors_table(
     ] = True
     # all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
     all_gen = all_gen[all_gen["gen_is_variable"] == True]
-
-    # get the correct GENERATION_PROJECT instead of region_resource_cluster from variability table
-    # all_gen = all_gen.copy()
-    # all_gen["region_resource_cluster"] = (
-    #     all_gen["region"]
-    #     + "_"
-    #     + all_gen["Resource"]
-    #     + "_"
-    #     + all_gen["cluster"].astype(str)
-    # )
-    # all_gen["gen_id"] = all_gen.index
-    # all_gen_convert = dict(
-    #     zip(all_gen["region_resource_cluster"].to_list(), all_gen["gen_id"].to_list())
-    # )
-
-    # reg_res_cl = all_gen["region_resource_cluster"].to_list()
-    # reg_res_cl = all_gen["temp_id"].to_list()
-    # reg_res_cl_copy =[str(i) for i in reg_res_cl]
-    # reg_res_cl =[i[0:-2] for i in reg_res_cl_copy]
-
-    # var_cap_fac["GENERATION_PROJECT"] = [
-    #     int(i) for i in var_cap_fac["GENERATION_PROJECT"]
-    # ]
 
     var_cap_fac = var_cap_fac[
         var_cap_fac["GENERATION_PROJECT"].isin(all_gen["Resource"])
