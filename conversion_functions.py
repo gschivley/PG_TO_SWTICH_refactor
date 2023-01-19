@@ -911,7 +911,7 @@ def timeseries(
         chunk_hr = chunk_days * 24
         n_chunks = len(sample_dates) // chunk_days
         chunk_df = []
-        for i in range(len(n_chunks) - 1):
+        for i in range(n_chunks):
             ck_df = (
                 (initial_df.iloc[i * chunk_hr : (i + 1) * chunk_hr, :])
                 .groupby("timeseries")
