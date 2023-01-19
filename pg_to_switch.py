@@ -43,11 +43,10 @@ from conversion_functions import (
     gen_build_predetermined,
     gen_build_costs_table,
     generation_projects_info,
-    hydro_timeseries,
+    hydro_time_tables,
     load_zones_table,
     fuel_market_tables,
     timeseries,
-    hydro_timepoints_table,
     graph_timestamp_map_table,
     loads_table,
     variable_capacity_factors_table,
@@ -655,13 +654,9 @@ def gen_prebuild_newbuild_info_files(
 
     ### edit by RR
     load_curves = make_final_load_curves(pg_engine, settings_list[0])
-    timeseries_df, timepoints_df, timestamp_interval= timeseries(
+    timeseries_df, timepoints_df, timestamp_interval = timeseries(
         load_curves,
         case_years,
-        max_weight=20.2778,
-        avg_weight=283.8889,
-        ts_duration_of_tp=4,
-        ts_num_tps=6,
         settings=settings,
     )
 
@@ -671,14 +666,11 @@ def gen_prebuild_newbuild_info_files(
     timepoints_dict = dict(
         zip(timepoints_timestamp, timepoints_tp_id)
     )  # {timestamp: timepoint_id}
-    hydro_timepoints_df = hydro_timepoints_table(timepoints_df)
-    hydro_timepoints_df
 
     graph_timestamp_map = graph_timestamp_map_table(timeseries_df, timestamp_interval)
     graph_timestamp_map
     timeseries_df.to_csv(out_folder / "timeseries.csv", index=False)
     timepoints_df.to_csv(out_folder / "timepoints.csv", index=False)
-    hydro_timepoints_df.to_csv(out_folder / "hydro_timepoints.csv", index=False)
     graph_timestamp_map.to_csv(out_folder / "graph_timestamp_map.csv", index=False)
 
     period_list = ["2020", "2030", "2040", "2050"]
@@ -698,10 +690,12 @@ def gen_prebuild_newbuild_info_files(
     )
 
     balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
-    hydro_timeseries_table = hydro_timeseries(
-        existing_gen, hydro_variability_new, period_list
+    hydro_timepoints, hydro_timeseries = hydro_time_tables(
+        existing_gen, hydro_variability_new, period_list, timepoints_df
     )
-    hydro_timeseries_table.to_csv(out_folder / "hydro_timeseries.csv", index=False)
+    hydro_timepoints.to_csv(out_folder / "hydro_timepoints.csv", index=False)
+
+    hydro_timeseries.to_csv(out_folder / "hydro_timeseries.csv", index=False)
 
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
