@@ -995,6 +995,28 @@ def ts_tp_pg_kmeans(
     planning_periods: List[int],
     planning_period_start_years: List[int],
 ):
+    """Create timeseries and timepoints tables when using kmeans time reduction in PG
+
+    Parameters
+    ----------
+    representative_point : pd.DataFrame
+        The representative periods used. Single column dataframe with col name "slot"
+    point_weights : List[int]
+        The weight assigned to each period. Equal to the number of periods in the year
+        that each period represents.
+    days_per_period : int
+        How long each period lasts in days
+    planning_periods : List[int]
+        A list of the planning years
+    planning_period_start_years : List[int]
+        A list of the start year for each planning period, used to calculate the number
+        of years in each period
+
+    Returns
+    -------
+    pd.DataFrame, pd.DataFrame
+        A tuple of the timeseries and timepoints dataframes
+    """
     ts_data = {
         "timeseries": [],
         "ts_period": [],
@@ -1028,6 +1050,21 @@ def ts_tp_pg_kmeans(
 
 
 def hydro_timepoints_pg_kmeans(timepoints: pd.DataFrame) -> pd.DataFrame:
+    """Create the timepoints table when using kmeans time reduction in PG
+
+    This assumes that the hydro timeseries are identical to the model timeseries.
+
+    Parameters
+    ----------
+    timepoints : pd.DataFrame
+        The timepoints table
+
+    Returns
+    -------
+    pd.DataFrame
+        Identical to the incoming timepoints table except "timepoint_id" is renamed to
+        "tp_to_hts"
+    """
 
     hydro_timepoints = timepoints.copy()
     hydro_timepoints = hydro_timepoints.rename(columns={"timeseries": "tp_to_hts"})
@@ -1036,11 +1073,38 @@ def hydro_timepoints_pg_kmeans(timepoints: pd.DataFrame) -> pd.DataFrame:
 
 
 def hydro_timeseries_pg_kmeans(
-    existing_gen,
-    hydro_variability,
+    existing_gen: pd.DataFrame,
+    hydro_variability: pd.DataFrame,
     hydro_timepoints: pd.DataFrame,
     outage_rate: float = 0.05,
-):
+) -> pd.DataFrame:
+    """Create hydro timeseries table when using kmeans time reduction in PG
+
+    The hydro timeseries table has columns hydro_project, timeseries, outage_rate,
+    hydro_min_flow_mw, and hydro_avg_flow_mw. The "timeseries" column links to the
+    column "tp_to_hts" in hydro_timepoints.csv. "hydro_min_flow_mw" uses the resource
+    minimum capacity (calculated in PG from EIA860). "hydro_avg_flow_mw" is the average
+    of flow during each timeseries.
+
+    Parameters
+    ----------
+    existing_gen : pd.DataFrame
+        All existing generators, one row per generator. Columns must include "Resource",
+        "Existing_Cap_MW", "Min_Power", and "HYDRO".
+    hydro_variability : pd.DataFrame
+        Hourly flow/generation capacity factors. Should have column names that correspond
+        to the "Resource" column in `existing_gen`. Additional column names will be
+        filtered out.
+    hydro_timepoints : pd.DataFrame
+        All timepoints for hydro, with the column "tp_to_hts"
+    outage_rate : float, optional
+        The average outage rate for hydro generators, by default 0.05
+
+    Returns
+    -------
+    pd.DataFrame
+        The hydro_timeseries table for Switch
+    """
 
     hydro_df = existing_gen.copy()
     hydro_df["min_cap_mw"] = hydro_df["Existing_Cap_MW"] * hydro_df["Min_Power"]
@@ -1053,6 +1117,9 @@ def hydro_timeseries_pg_kmeans(
             hydro_df["Resource"] == col, "Existing_Cap_MW"
         ].values[0]
 
+    # length_ratio should be equal to the number of planning periods. hydro_timepoints
+    # is the total number of timepoints (hours) across all periods. hydro_variability
+    # is just the hours for a single planning period.
     length_ratio = int(len(hydro_timepoints) / len(hydro_variability))
     hydro_variability = pd.concat([hydro_variability] * length_ratio, ignore_index=True)
     assert len(hydro_variability) == len(hydro_timepoints)
@@ -1078,10 +1145,36 @@ def hydro_timeseries_pg_kmeans(
     return hydro_ts[cols]
 
 
-def variable_cf_pg_kmeans(all_gen_variability, timepoints):
+def variable_cf_pg_kmeans(
+    all_gens: pd.DataFrame, all_gen_variability: pd.DataFrame, timepoints: pd.DataFrame
+) -> pd.DataFrame:
+    """Create the variable capacity factors table when using kmeans time reduction in PG
 
-    vre_gens = all_gen_variability.columns[all_gen_variability.mean() < 1]
+    Variable generators are identified as those with hourly average capacity factors
+    less than 1.
+
+    Parameters
+    ----------
+    all_gens : pd.DataFrame
+        All resources. Must have the columns "Resource" and "VRE".
+    all_gen_variability : pd.DataFrame
+        Wide dataframe with hourly capacity factors of all generators.
+    timepoints : pd.DataFrame
+        Timepoints table with column "timepoint_id"
+
+    Returns
+    -------
+    pd.DataFrame
+        Tidy dataframe with columns "GENERATION_PROJECT", "timepoint", and
+        "gen_max_capacity_factor"
+    """
+
+    vre_gens = all_gens.loc[all_gens["VRE"] == 1, "Resource"]
     vre_variability = all_gen_variability[vre_gens]
+
+    # length_ratio should be equal to the number of planning periods. timepoints
+    # is the total number of timepoints (hours) across all periods. all_gen_variability
+    # is just the hours for a single planning period.
     length_ratio = int(len(timepoints) / len(all_gen_variability))
     vre_variability = pd.concat([vre_variability] * length_ratio, ignore_index=True)
     assert len(vre_variability) == len(timepoints)
@@ -1096,8 +1189,26 @@ def variable_cf_pg_kmeans(all_gen_variability, timepoints):
     return vre_ts
 
 
-def load_pg_kmeans(load_curves, timepoints):
+def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.DataFrame:
+    """Create the loads table when using kmeans time reduction in PG
+
+    Parameters
+    ----------
+    load_curves : pd.DataFrame
+        Wide dataframe with one column of demand values for each zone
+    timepoints : pd.DataFrame
+        Timepoints table with column "timepoint_id"
+
+    Returns
+    -------
+    pd.DataFrame
+        Tidy dataframe with columns "LOAD_ZONE" and "TIMEPOINT"
+    """
     load_curves = load_curves.astype(int)
+
+    # length_ratio should be equal to the number of planning periods. timepoints
+    # is the total number of timepoints (hours) across all periods. load_curves
+    # is just the hours for a single planning period.
     length_ratio = int(len(timepoints) / len(load_curves))
     load_curves = pd.concat([load_curves] * length_ratio, ignore_index=True)
     assert len(load_curves) == len(timepoints)
