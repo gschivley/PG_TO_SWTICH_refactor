@@ -14,6 +14,8 @@ model_year: [2020, 2030, 2040, 2050]
 model_first_planning_year: [2020, 2021, 2031, 2041]
 
 
+# baseyear_dates: baseyear_dates.csv # list your base year date in this csv file under the inputs_folder if the base year is not a whole year(365 days)
+
 # The location and name of additional input files needed to create outputs
 # taylor_nb: Jupyter_Notebooks # RR
 input_folder: extra_inputs # Subfolder directly below the location of this settings file
@@ -369,53 +371,53 @@ small_hydro_regions:
 # ERC is texas
 # The rest is eastern
 model_regions:
-  # - ERC_REST
-  # - ERC_PHDL_WEST
-  - FRCC
-  - MIS_AMSO
-  - MIS_AR
-  - MIS_D_MS
-  - MIS_IA
-  - MIS_IL
-  - MIS_INKY
-  - MIS_LA
-  - MIS_LMI
-  - MIS_MAPP
-  - MIS_MIDA
-  - MIS_MNWI
-  - MIS_MO
-  - MIS_WOTA
-  - MIS_WUMS
-  - NENG_CT
-  - NENG_ME
-  - NENGREST
-  - NY_Z_A
-  - NY_Z_B
-  - NY_Z_C&E
-  - NY_Z_D
-  - NY_Z_F
-  - NY_Z_G-I
-  - NY_Z_J
-  - NY_Z_K
-  - PJM_AP
-  - PJM_ATSI
-  - PJM_COMD
-  - PJM_Dom
-  - PJM_EMAC
-  - PJM_PENE
-  - PJM_SMAC  
-  - PJM_West
-  - PJM_WMAC
-  - S_C_KY
-  - S_C_TVA
-  - S_D_AECI
-  - S_SOU
-  - S_VACA
-  - SPP_N
-  - SPP_NEBR
-  - SPP_SPS
-  - SPP_WAUE
-  - SPP_WEST
+  - ERC_REST
+  - ERC_PHDL_WEST
+  # - FRCC
+  # - MIS_AMSO
+  # - MIS_AR
+  # - MIS_D_MS
+  # - MIS_IA
+  # - MIS_IL
+  # - MIS_INKY
+  # - MIS_LA
+  # - MIS_LMI
+  # - MIS_MAPP
+  # - MIS_MIDA
+  # - MIS_MNWI
+  # - MIS_MO
+  # - MIS_WOTA
+  # - MIS_WUMS
+  # - NENG_CT
+  # - NENG_ME
+  # - NENGREST
+  # - NY_Z_A
+  # - NY_Z_B
+  # - NY_Z_C&E
+  # - NY_Z_D
+  # - NY_Z_F
+  # - NY_Z_G-I
+  # - NY_Z_J
+  # - NY_Z_K
+  # - PJM_AP
+  # - PJM_ATSI
+  # - PJM_COMD
+  # - PJM_Dom
+  # - PJM_EMAC
+  # - PJM_PENE
+  # - PJM_SMAC  
+  # - PJM_West
+  # - PJM_WMAC
+  # - S_C_KY
+  # - S_C_TVA
+  # - S_D_AECI
+  # - S_SOU
+  # - S_VACA
+  # - SPP_N
+  # - SPP_NEBR
+  # - SPP_SPS
+  # - SPP_WAUE
+  # - SPP_WEST
   # - WEC_BANC
   # - WEC_CALN
   # - WEC_LADW
@@ -435,10 +437,10 @@ model_regions:
 
 
 # Comment out this setting if no aggregated regions are included in the study.
-# region_aggregations:
-#   ERC_PHDL_WEST: [ERC_PHDL, ERC_WEST]
-#   # CA_N: [WEC_CALN, WEC_BANC]
-#   # CA_S: [WEC_LADW, WECC_SCE, WEC_SDGE, WECC_IID]
+region_aggregations:
+  ERC_PHDL_WEST: [ERC_PHDL, ERC_WEST]
+  # CA_N: [WEC_CALN, WEC_BANC]
+  # CA_S: [WEC_LADW, WECC_SCE, WEC_SDGE, WECC_IID]
 
 
 regional_capacity_reserves: # TAYLOR - changed to 1. PG code seems to not like it when it is just ~
@@ -1004,33 +1006,33 @@ pv_ac_dc_ratio: 1.3
 
 # TAYLOR - not clustering - ignoring, but seem to need region/tech/max/min in order to run nrelatb
 renewables_clusters:
-  # - region: CA_N
-  #   technology: landbasedwind
-  #   max_clusters: 2
-  #   max_lcoe: 110
-  #   min_capacity: 25000
-  # - region: CA_N
-  #   technology: offshorewind
-  #   turbine_type: floating
-  #   pref_site: 1
-  #   max_clusters: 3
-  #   min_capacity: 40000
-  # - region: CA_S
-  #   technology: landbasedwind
-  #   max_clusters: 4
-  #   max_lcoe: 100
-  #   min_capacity: 45000
-  # - region: CA_S
-  #   technology: utilitypv
-  #   max_clusters: 5
-  #   max_lcoe: 75
-  #   min_capacity: 100000
-  #   # cap_multiplier: 0.2
-  # - region: WECC_AZ
-  #   technology: utilitypv
-  #   max_clusters: 3
-  #   min_capacity: 100000
-  #   # cap_multiplier: 0.2  
+  - region: CA_N
+    technology: landbasedwind
+    max_clusters: 2
+    max_lcoe: 110
+    min_capacity: 25000
+  - region: CA_N
+    technology: offshorewind
+    turbine_type: floating
+    pref_site: 1
+    max_clusters: 3
+    min_capacity: 40000
+  - region: CA_S
+    technology: landbasedwind
+    max_clusters: 4
+    max_lcoe: 100
+    min_capacity: 45000
+  - region: CA_S
+    technology: utilitypv
+    max_clusters: 5
+    max_lcoe: 75
+    min_capacity: 100000
+    # cap_multiplier: 0.2
+  - region: WECC_AZ
+    technology: utilitypv
+    max_clusters: 3
+    min_capacity: 100000
+    # cap_multiplier: 0.2  
   - region: ERC_PHDL_WEST
     technology: landbasedwind
     max_clusters: 1
@@ -1564,7 +1566,7 @@ aeo_fuel_region_map:
   pacific: [WECC_PNW, WEC_CALN, WEC_BANC, WECC_IID, WECC_SCE, WEC_LADW, WEC_SDGE, CA_N, CA_S]
   west_south_central: [ERC_PHDL_WEST, ERC_REST, SPP_WEST, SPP_SPS, MIS_AMSO, MIS_WOTA, MIS_LA, MIS_AR]
   east_south_central: [MIS_D_MS, S_C_TVA, S_C_KY]
-  south_atlantic: [FRCC, S_SOU, S_VACA, PJM_Dom, PJM_SMAC, PJM_AP]
+  south_atlantic: [FRCC, S_SOU, S_VACA, PJM_Dom, PJM_AP]
   west_north_central: [MIS_MAPP, SPP_WAUE, SPP_NEBR, MIS_MIDA, SPP_N, MIS_MNWI, MIS_IA, MIS_MO, S_D_AECI]
   east_north_central: [MIS_WUMS, MIS_LMI, PJM_COMD, MIS_IL, MIS_INKY, PJM_West, PJM_ATSI]
   middle_atlantic: [PJM_WMAC, PJM_EMAC, PJM_SMAC, PJM_PENE, NY_Z_A, NY_Z_B, NY_Z_C&E, NY_Z_D, NY_Z_F, NY_Z_G-I, NY_Z_J, NY_Z_K]

@@ -48,7 +48,6 @@ from conversion_functions import (
     load_zones_table,
     fuel_market_tables,
     timeseries,
-    timepoints_table,
     hydro_timepoints_table,
     graph_timestamp_map_table,
     loads_table,
@@ -122,6 +121,7 @@ def fuel_files(
     zone_regional_fm
     # creating dummy values based on one load zone in REAM's input file
     # note:regional_fuel_market should align with the regional_fuel_market table.
+    # TODO --RR
     fuel_supply_curves20 = pd.DataFrame(
         {
             "period": [2020, 2020, 2020, 2020, 2020, 2020],
@@ -453,7 +453,7 @@ def gen_projects_info_file(
     gen_project_info.rename(
         columns={"total_capacity": "gen_capacity_limit_mw"}, inplace=True
     )
-
+    gen_project_info = gen_project_info.drop_duplicates(subset="GENERATION_PROJECT")
     gen_project_info.to_csv(out_folder / "generation_projects_info.csv", index=False)
 
 
@@ -461,6 +461,7 @@ def gen_prebuild_newbuild_info_files(
     gc: GeneratorClusters,
     pudl_engine: sa.engine,
     settings_list: List[dict],
+    case_years: List,
     out_folder: Path,
     pg_engine: sa.engine,
     hydro_variability_new: pd.DataFrame,
@@ -703,37 +704,47 @@ def gen_prebuild_newbuild_info_files(
             hydro_timepoints_df,
         )
 
-        vcf = variable_cf_pg_kmeans(
-            all_gen_variability, timepoints_df
-        )
+        vcf = variable_cf_pg_kmeans(all_gen_variability, timepoints_df)
 
         loads = load_pg_kmeans(load_curves, timepoints_df)
+    else:
+        timeseries_df, timepoints_df, timestamp_interval = timeseries(
+            load_curves,
+            case_years,
+            max_weight=20.2778,
+            avg_weight=283.8889,
+            ts_duration_of_tp=4,
+            ts_num_tps=6,
+            settings=settings,
+        )
 
-    timeseries_df = timeseries(
-        load_curves,
-        max_weight=20.2778,
-        avg_weight=283.8889,
-        ts_duration_of_tp=4,
-        ts_num_tps=6,
-    )
-    timeseries_dates = timeseries_df["timeseries"].to_list()
-    timestamp_interval = [
-        "00",
-        "04",
-        "08",
-        "12",
-        "16",
-        "20",
-    ]  # should align with ts_duration_of_tp and ts_num_tps
-    timepoints_df = timepoints_table(timeseries_dates, timestamp_interval)
-    # create lists and dictionary for later use
-    timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
-    timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
-    timepoints_dict = dict(
-        zip(timepoints_timestamp, timepoints_tp_id)
-    )  # {timestamp: timepoint_id}
-    hydro_timepoints_df = hydro_timepoints_table(timepoints_df)
-    hydro_timepoints_df
+        # create lists and dictionary for later use
+        timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
+        timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
+        timepoints_dict = dict(
+            zip(timepoints_timestamp, timepoints_tp_id)
+        )  # {timestamp: timepoint_id}
+        hydro_timepoints_df = hydro_timepoints_table(timepoints_df)
+        hydro_timepoints_df
+
+        hydro_timeseries_table = hydro_timeseries(
+            existing_gen, hydro_variability_new, planning_periods
+        )
+
+        loads, loads_with_year_hour = loads_table(
+            load_curves, timepoints_timestamp, timepoints_dict, planning_periods
+        )
+        # for fuel_cost and regional_fuel_market issue
+        dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
+        dummy_df.insert(0, "LOAD_ZONE", "loadzone")
+        dummy_df.insert(2, "zone_demand_mw", 0)
+        loads = loads.append(dummy_df)
+
+        year_hour = loads_with_year_hour["year_hour"].to_list()
+
+        vcf = variable_capacity_factors_table(
+            all_gen_variability, year_hour, timepoints_dict, all_gen, case_years
+        )
 
     graph_timestamp_map = graph_timestamp_map_table(timeseries_df, timestamp_interval)
     graph_timestamp_map
@@ -742,26 +753,7 @@ def gen_prebuild_newbuild_info_files(
     hydro_timepoints_df.to_csv(out_folder / "hydro_timepoints.csv", index=False)
     graph_timestamp_map.to_csv(out_folder / "graph_timestamp_map.csv", index=False)
 
-    period_list = ["2020", "2030", "2040", "2050"]
-    loads, loads_with_year_hour = loads_table(
-        load_curves, timepoints_timestamp, timepoints_dict, period_list
-    )
-    # for fuel_cost and regional_fuel_market issue
-    dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
-    dummy_df.insert(0, "LOAD_ZONE", "loadzone")
-    dummy_df.insert(2, "zone_demand_mw", 0)
-    loads = loads.append(dummy_df)
-
-    year_hour = loads_with_year_hour["year_hour"].to_list()
-
-    vcf = variable_capacity_factors_table(
-        all_gen_variability, year_hour, timepoints_dict, all_gen
-    )
-
     balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
-    hydro_timeseries_table = hydro_timeseries(
-        existing_gen, hydro_variability_new, period_list
-    )
     hydro_timeseries_table.to_csv(out_folder / "hydro_timeseries.csv", index=False)
 
     loads.to_csv(out_folder / "loads.csv", index=False)
@@ -993,6 +985,7 @@ def main(settings_file: str, results_folder: str):
             gc,
             pudl_engine,
             settings_list,
+            case_years,
             case_folder,
             pg_engine,
             hydro_variability_new,
