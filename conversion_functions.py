@@ -851,8 +851,8 @@ def ts_tp_pg_kmeans(
     representative_point: pd.DataFrame,
     point_weights: List[int],
     days_per_period: int,
-    planning_periods: List[int],
-    planning_period_start_years: List[int],
+    planning_year: int,
+    planning_start_year: int,
 ):
     """Create timeseries and timepoints tables when using kmeans time reduction in PG
 
@@ -887,19 +887,18 @@ def ts_tp_pg_kmeans(
         "timestamp": [],
         "timeseries": [],
     }
-    for yr, start_yr in zip(planning_periods, planning_period_start_years):
-        planning_yrs = yr - start_yr
-        for p, weight in zip(representative_point, point_weights):
-            num_hours = days_per_period * 24
-            ts = f"{yr}_{p}"
-            ts_data["timeseries"].append(ts)
-            ts_data["ts_period"].append(yr)
-            ts_data["ts_duration_of_tp"].append(1)
-            ts_data["ts_num_tps"].append(num_hours)
-            ts_data["ts_scale_to_period"].append(weight * num_hours * planning_yrs)
+    planning_yrs = planning_year - planning_start_year
+    for p, weight in zip(representative_point, point_weights):
+        num_hours = days_per_period * 24
+        ts = f"{planning_year}_{p}"
+        ts_data["timeseries"].append(ts)
+        ts_data["ts_period"].append(planning_year)
+        ts_data["ts_duration_of_tp"].append(1)
+        ts_data["ts_num_tps"].append(num_hours)
+        ts_data["ts_scale_to_period"].append(weight * num_hours * planning_yrs)
 
-            tp_data["timestamp"].extend([f"{ts}_{i}" for i in range(num_hours)])
-            tp_data["timeseries"].extend([ts for i in range(num_hours)])
+        tp_data["timestamp"].extend([f"{ts}_{i}" for i in range(num_hours)])
+        tp_data["timeseries"].extend([ts for i in range(num_hours)])
 
     timeseries = pd.DataFrame(ts_data)
     timepoints = pd.DataFrame(tp_data)
@@ -932,7 +931,7 @@ def hydro_timepoints_pg_kmeans(timepoints: pd.DataFrame) -> pd.DataFrame:
 
 
 def hydro_timeseries_pg_kmeans(
-    existing_gen: pd.DataFrame,
+    gen: pd.DataFrame,
     hydro_variability: pd.DataFrame,
     hydro_timepoints: pd.DataFrame,
     outage_rate: float = 0.05,
@@ -965,7 +964,7 @@ def hydro_timeseries_pg_kmeans(
         The hydro_timeseries table for Switch
     """
 
-    hydro_df = existing_gen.copy()
+    hydro_df = gen.copy()
     hydro_df["min_cap_mw"] = hydro_df["Existing_Cap_MW"] * hydro_df["Min_Power"]
     hydro_df = hydro_df.loc[hydro_df["HYDRO"] == 1, :]
 
@@ -975,17 +974,10 @@ def hydro_timeseries_pg_kmeans(
         hydro_variability[col] *= hydro_df.loc[
             hydro_df["Resource"] == col, "Existing_Cap_MW"
         ].values[0]
-
-    # length_ratio should be equal to the number of planning periods. hydro_timepoints
-    # is the total number of timepoints (hours) across all periods. hydro_variability
-    # is just the hours for a single planning period.
-    length_ratio = int(len(hydro_timepoints) / len(hydro_variability))
-    hydro_variability = pd.concat([hydro_variability] * length_ratio, ignore_index=True)
-    assert len(hydro_variability) == len(hydro_timepoints)
     hydro_variability["timeseries"] = hydro_timepoints["tp_to_hts"].values
     hydro_ts = hydro_variability.melt(id_vars=["timeseries"])
-    hydro_ts["hydro_avg_flow_mw"] = hydro_ts.groupby("timeseries")["value"].transform(
-        "mean"
+    hydro_ts = hydro_ts.groupby(["timeseries", "Resource"], as_index=False).agg(
+        hydro_avg_flow_mw=("value", "mean")
     )
 
     hydro_ts["hydro_min_flow_mw"] = hydro_ts["Resource"].map(
@@ -1030,13 +1022,6 @@ def variable_cf_pg_kmeans(
 
     vre_gens = all_gens.loc[all_gens["VRE"] == 1, "Resource"]
     vre_variability = all_gen_variability[vre_gens]
-
-    # length_ratio should be equal to the number of planning periods. timepoints
-    # is the total number of timepoints (hours) across all periods. all_gen_variability
-    # is just the hours for a single planning period.
-    length_ratio = int(len(timepoints) / len(all_gen_variability))
-    vre_variability = pd.concat([vre_variability] * length_ratio, ignore_index=True)
-    assert len(vre_variability) == len(timepoints)
     vre_variability["timepoint_id"] = timepoints["timepoint_id"].values
     vre_ts = vre_variability.melt(
         id_vars=["timepoint_id"], value_name="gen_max_capacity_factor"
@@ -1064,13 +1049,6 @@ def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.Da
         Tidy dataframe with columns "LOAD_ZONE" and "TIMEPOINT"
     """
     load_curves = load_curves.astype(int)
-
-    # length_ratio should be equal to the number of planning periods. timepoints
-    # is the total number of timepoints (hours) across all periods. load_curves
-    # is just the hours for a single planning period.
-    length_ratio = int(len(timepoints) / len(load_curves))
-    load_curves = pd.concat([load_curves] * length_ratio, ignore_index=True)
-    assert len(load_curves) == len(timepoints)
     load_curves["TIMEPOINT"] = timepoints["timepoint_id"].values
     load_ts = load_curves.melt(id_vars=["TIMEPOINT"], value_name="zone_demand_mw")
     load_ts = load_ts.rename(columns={"region": "LOAD_ZONE"})
@@ -1080,7 +1058,8 @@ def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.Da
 
 def timeseries(
     load_curves,
-    case_years,
+    planning_year,
+    planning_start_year,
     settings,
 ):  # 20.2778, 283.8889
     """
@@ -1103,7 +1082,7 @@ def timeseries(
             settings.get("input_folder") / settings["sample_dates_fn"]
         )
     else:
-        sample_year = min(case_years)
+        sample_year = planning_year
         sample_year_start = str(sample_year) + "0101"
         sample_year_end = str(sample_year) + "1231"
         sample_dates = [
@@ -1144,6 +1123,7 @@ def timeseries(
         # split dataframe into chunks of representative_days
         chunk_hr = chunk_days * 24
         n_chunks = len(sample_dates) // chunk_days
+        num_days = chunk_days * n_chunks
         chunk_df = []
         for i in range(n_chunks):
             ck_df = (
@@ -1168,7 +1148,7 @@ def timeseries(
             8016,
             8760,
         ]  # cumulative hours by month
-
+        num_days = sum(month_hrs) / 24
         # split dataframe into months (grouped by day)
         chunk_df = []
         chunk_df.append(
@@ -1198,8 +1178,8 @@ def timeseries(
 
     # add in other columns
     timeseries_df["ts_period"] = str(sample_year)
-    ts_duration_of_tp = settings.get("ts_duration_of_tp")
-    ts_num_tps = settings.get("ts_num_tps")
+    ts_duration_of_tp = settings.get("ts_duration_of_tp", 1)
+    ts_num_tps = settings.get("ts_num_tps", 24 / ts_duration_of_tp)
     timeseries_df["ts_duration_of_tp"] = ts_duration_of_tp  # assuming 4 for now
     timeseries_df["ts_num_tps"] = ts_num_tps  # assuming 6 for now
     timeseries_df = timeseries_df.reset_index(drop=True)
@@ -1207,9 +1187,11 @@ def timeseries(
 
     timeseries_df["ts_scale_to_period"] = None
 
-    planning_years = settings.get("planning_years")
-    max_days = settings.get("max_days")
-    sample_to_year_ratio = round(8760 / (len(sample_dates) * 24), 3)
+    planning_years = planning_year - planning_start_year
+    max_days = settings.get("max_days", 1)
+    sample_to_year_ratio = (
+        round(8760 / (num_days * 24), 3) * ts_duration_of_tp * ts_num_tps
+    )
     max_weight = planning_years * max_days * sample_to_year_ratio
     avg_weight = planning_years * (chunk_days - max_days) * sample_to_year_ratio
 
@@ -1220,18 +1202,18 @@ def timeseries(
         to_replace=[None], value=avg_weight, inplace=True
     )
 
-    # add in addtional years (just replace 2020 with new year)
-    addtl_yrs = case_years
-    addtl_yrs.remove(sample_year)
-    addtl_df = pd.DataFrame(columns=timeseries_df.columns)
-    for y in addtl_yrs:
-        df = timeseries_df.copy()
-        df["ts_period"] = str(y)
-        col1 = df["timeseries"].to_list()
-        col1 = [str(y) + "_" + str(y) + x[9:] for x in col1]
-        df["timeseries"] = col1
-        addtl_df = addtl_df.append(df)
-    timeseries_df = timeseries_df.append(addtl_df)
+    # # add in addtional years (just replace 2020 with new year)
+    # addtl_yrs = case_years
+    # addtl_yrs.remove(sample_year)
+    # addtl_df = pd.DataFrame(columns=timeseries_df.columns)
+    # for y in addtl_yrs:
+    #     df = timeseries_df.copy()
+    #     df["ts_period"] = str(y)
+    #     col1 = df["timeseries"].to_list()
+    #     col1 = [str(y) + "_" + str(y) + x[9:] for x in col1]
+    #     df["timeseries"] = col1
+    #     addtl_df = addtl_df.append(df)
+    # timeseries_df = timeseries_df.append(addtl_df)
     timeseries_df = timeseries_df[
         [
             "timeseries",
@@ -1378,20 +1360,23 @@ def hydro_time_tables(existing_gen, hydro_variability, timepoints_df, planning_y
         # df["hydro_avg_flow_mw_raw"] = month_df[i].mean(axis=1).to_list()
         # df["hydro_avg_flow_mw"] = df["hydro_avg_flow_mw_raw"] * (1 - df["outage_rate"])
         df_list.append(df)
-    hydro_final = pd.concat(df_list, axis=0)
+    hydro_timeseries = pd.concat(df_list, axis=0)
+    hydro_timeseries["timeseries"] = (
+        str(planning_year) + "_" + hydro_timeseries["timeseries"]
+    )
     # # get the index of existing gen for the hydro_project columnn (tie to GENERATION_PROJECTS)
     # hydro_df['region_resource_cluster'] = hydro_df["region"]+ "_"+ hydro_df["Resource"]+ "_"+ hydro_df["cluster"].astype(str)
     # hydro_index_dict = dict(zip(hydro_df['region_resource_cluster'].to_list(), hydro_df['index'].to_list()))
     # hydro_final['hydro_project'] = hydro_final['hydro_project'].apply(lambda x: hydro_index_dict[x])
     # # generation_project starts wtih 1 not 0
     # hydro_final["hydro_project"] = hydro_final["hydro_project"].apply(lambda x: x + 1)
-    timeseries_list = list()
-    for decade in period_list:
-        df2 = hydro_final.copy()
-        df2["timeseries"] = decade + "_" + df2["timeseries"]
-        timeseries_list.append(df2)
+    # timeseries_list = list()
+    # for decade in period_list:
+    #     df2 = hydro_final.copy()
+    #     df2["timeseries"] = decade + "_" + df2["timeseries"]
+    #     timeseries_list.append(df2)
 
-    hydro_timeseries = pd.concat(timeseries_list, axis=0)
+    # hydro_timeseries = pd.concat(timeseries_list, axis=0)
 
     # hydro_final_df = hydro_final_df.drop(
     #     columns=["outage_rate", "hydro_min_flow_mw_raw", "hydro_avg_flow_mw_raw"]
@@ -1444,7 +1429,7 @@ def graph_timestamp_map_table(timeseries_df, timestamp_interval):
     return graph_timeseries_map
 
 
-def loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list):
+def loads_table(load_curves, timepoints_timestamp, timepoints_dict, planning_year):
     """
     Inputs:
         load_curves: from powergenome
@@ -1486,16 +1471,16 @@ def loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
     date_list = loads_initial["reformat"].to_list()
 
     # loop through for each period
-    df_list = list()
-    for p in period_list:
-        df = loads_initial.copy()
-        updated_dates = [p + x[4:] for x in date_list]
-        df["timestamp"] = updated_dates
-        df_list.append(df)
-    loads = pd.concat(df_list)
+    # df_list = list()
+    # for p in period_list:
+    #     df = loads_initial.copy()
+    updated_dates = [f"{planning_year}" + x[4:] for x in date_list]
+    loads_initial["timestamp"] = updated_dates
+    #     df_list.append(df)
+    # loads = pd.concat(df_list)
 
     # filter to correct timestamps for timepoints
-    loads = loads[loads["timestamp"].isin(timepoints_timestamp)]
+    loads = loads_initial.loc[loads_initial["timestamp"].isin(timepoints_timestamp)]
     loads["TIMEPOINT"] = loads["timestamp"].apply(lambda x: timepoints_dict[x])
     loads_with_year_hour = loads[["timestamp", "TIMEPOINT", "year_hour"]]
     loads = loads[["LOAD_ZONE", "TIMEPOINT", "zone_demand_mw"]]
@@ -1504,7 +1489,7 @@ def loads_table(load_curves, timepoints_timestamp, timepoints_dict, period_list)
 
 
 def variable_capacity_factors_table(
-    all_gen_variability, year_hour, timepoints_dict, all_gen, case_years
+    all_gen_variability, year_hour, timepoints_dict, all_gen, planning_year
 ):
     """
     Inputs
@@ -1540,37 +1525,33 @@ def variable_capacity_factors_table(
     date_list = mod_vcf["reformat"].to_list()
     # change 2021 to correct period year/decade
     # to get the timestamp
-    var_cap_fac = pd.DataFrame()
-    for i in case_years:
-        updated_dates = [str(i) + x[4:] for x in date_list]
-        mod_vcf_copy = mod_vcf.copy()
-        mod_vcf_copy["timestamp"] = updated_dates
-        mod_vcf_copy["timepoint"] = mod_vcf_copy["timestamp"].apply(
-            lambda x: timepoints_dict[x]
-        )
-        mod_vcf_copy.drop(
-            ["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True
-        )
-        var_cap_fac = pd.concat([var_cap_fac, mod_vcf_copy], ignore_index=True)
+    # var_cap_fac = pd.DataFrame()
+    # for i in case_years:
+    updated_dates = [str(planning_year) + x[4:] for x in date_list]
+    #     mod_vcf_copy = mod_vcf.copy()
+    mod_vcf["timestamp"] = updated_dates
+    mod_vcf["timepoint"] = mod_vcf["timestamp"].apply(lambda x: timepoints_dict[x])
+    mod_vcf.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
+    #     var_cap_fac = pd.concat([var_cap_fac, mod_vcf_copy], ignore_index=True)
 
-    # only get all_gen plants that are wind or solar
-    technology = all_gen["technology"].to_list()
+    # # only get all_gen plants that are wind or solar
+    # technology = all_gen["technology"].to_list()
 
-    def Filter(list1, list2):
-        return [n for n in list1 if any(m in n for m in list2)]
+    # def Filter(list1, list2):
+    #     return [n for n in list1 if any(m in n for m in list2)]
 
     # all_gen["temp_id"] = all_gen.index
-    all_gen.loc[
-        all_gen["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
-    ] = True
-    all_gen.loc[
-        all_gen["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
-    ] = True
-    # all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
-    all_gen = all_gen[all_gen["gen_is_variable"] == True]
+    # all_gen.loc[
+    #     all_gen["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
+    # ] = True
+    # all_gen.loc[
+    #     all_gen["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
+    # ] = True
+    # # all_gen.loc[all_gen["technology"].str.contains("PV"), "gen_is_variable"] = True
+    all_gen = all_gen.loc[all_gen["VRE"] == 1, :]
 
-    var_cap_fac = var_cap_fac[
-        var_cap_fac["GENERATION_PROJECT"].isin(all_gen["Resource"])
+    var_cap_fac = mod_vcf.loc[
+        mod_vcf["GENERATION_PROJECT"].isin(all_gen["Resource"]), :
     ]
 
     # filter to final columns
