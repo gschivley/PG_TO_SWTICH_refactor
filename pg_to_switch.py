@@ -736,6 +736,10 @@ def gen_prebuild_newbuild_info_files(
                 settings["model_first_planning_year"],
                 settings=settings,
             )
+            timepoints_df["timepoint_id"] = range(
+                timepoint_start, timepoint_start + len(timepoints_df)
+            )
+            timepoint_start = timepoints_df["timepoint_id"].max() + 1
 
             # create lists and dictionary for later use
             timepoints_timestamp = timepoints_df[
