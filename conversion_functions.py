@@ -1302,38 +1302,18 @@ def hydro_time_tables(existing_gen, hydro_variability, timepoints_df, planning_y
     hydro_timepoints["tp_to_hts"] = hydro_timepoints["timestamp"].apply(convert)
     hydro_timepoints.drop("timestamp", axis=1, inplace=True)
 
-    hydro_list = [
-        "Conventional Hydroelectric",
-        # "Hydroelectric Pumped Storage",
-        "Small Hydroelectric",
-    ]
-
-    # filter existing gen to just hydro technologies
-    # hydro_df = existing_gen.copy()
-    # hydro_df['index'] = hydro_df.index
-    # hydro_df = hydro_df[hydro_df['technology'].isin(hydro_list)]
-    # hydro_indx = hydro_df['index'].to_list()
-
-    # # get existing variability for the hydro technologies
-    # hydro_variability = existing_variability.copy()
-
-    # hydro_variability = hydro_variability.iloc[:, hydro_indx] # hydro hourly for 1 year
-
     #### edit by RR
     # filter existing gen to just hydro technologies
     hydro_df = existing_gen.copy()
-    # hydro_df["index"] = hydro_df.index
-    hydro_df = hydro_df[hydro_df["technology"].isin(hydro_list)]
+    hydro_df = hydro_df.loc[hydro_df["HYDRO"] == 1, :]
     hydro_indx = hydro_df["Resource"].to_list()
     hydro_region = hydro_df["region"].to_list()
 
     # get existing variability for the hydro technologies
-    # hydro_variability = existing_variability.copy()
-    # hydro_variability = hydro_variability_new.copy()
     # slice the hours to 8760
     hydro_variability = hydro_variability.iloc[:8760]
     # hydro_variability = hydro_variability.iloc[:, hydro_indx] # hydro hourly for 1 year
-    hydro_variability = hydro_variability.loc[:, hydro_region]
+    hydro_variability = hydro_variability.loc[:, hydro_indx]
     hydro_variability.columns = hydro_indx
     ####
 
