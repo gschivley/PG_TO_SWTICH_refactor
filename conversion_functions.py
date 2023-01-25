@@ -1267,7 +1267,7 @@ def timeseries(
     return timeseries_df, timepoints_df, timestamp_interval
 
 
-def hydro_time_tables(existing_gen, hydro_variability, period_list, timepoints_df):
+def hydro_time_tables(existing_gen, hydro_variability, timepoints_df, planning_year):
     """
     Create the hydro_timepoints table based on REAM Scenario 178
     Inputs:
@@ -1279,6 +1279,28 @@ def hydro_time_tables(existing_gen, hydro_variability, period_list, timepoints_d
 
     hydro_timepoints = timepoints_df
     hydro_timepoints = hydro_timepoints.rename(columns={"timeseries": "tp_to_hts"})
+    convert_to_hts = {
+        "01": "_M1",
+        "02": "_M2",
+        "03": "_M3",
+        "04": "_M4",
+        "05": "_M5",
+        "06": "_M6",
+        "07": "_M7",
+        "08": "_M8",
+        "09": "_M9",
+        "10": "_M10",
+        "11": "_M11",
+        "12": "_M12",
+    }
+
+    def convert(tstamp):
+        month = tstamp[4:6]
+        year = tstamp[0:4]
+        return year + convert_to_hts[month]
+
+    hydro_timepoints["tp_to_hts"] = hydro_timepoints["timestamp"].apply(convert)
+    hydro_timepoints.drop("timestamp", axis=1, inplace=True)
 
     hydro_list = [
         "Conventional Hydroelectric",
