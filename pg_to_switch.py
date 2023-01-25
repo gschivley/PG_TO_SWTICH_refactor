@@ -806,7 +806,6 @@ def gen_prebuild_newbuild_info_files(
 
     balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
     hydro_timeseries_table.to_csv(out_folder / "hydro_timeseries.csv", index=False)
-
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
     ###

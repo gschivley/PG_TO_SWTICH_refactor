@@ -642,12 +642,12 @@ def generation_projects_info(
     ] = (gen_project_info["spur_capex_mw_mi"] * gen_project_info["spur_miles"])
     gen_project_info = gen_project_info.drop(["spur_miles", "spur_capex_mw_mi"], axis=1)
 
-    # Heat_Rate_MMBTU_per_MWh needs to be converted to Btu/kWh for gen_full_load_heat_rate
-    # mmbtu * 1000000 = btu and 1 mwh * 1000 = kwh
-    # 1000000 / 1000 = * 1000
+    # Heat_Rate_MMBTU_per_MWh needs to be converted to mBtu/kWh for gen_full_load_heat_rate
+    # mmbtu * 1000 = mbtu and 1 mwh * 1000 = kwh
+    # 1 MMBTU_per_MWh = 1 mBtu/kWh
     gen_project_info["Heat_Rate_MMBTU_per_MWh"] = gen_project_info[
         "Heat_Rate_MMBTU_per_MWh"
-    ].apply(lambda x: x * 1000)
+    ]
 
     # for gen_is_variable - only solar and wind technologies are true
     technology = all_gen["technology"].to_list()
