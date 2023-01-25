@@ -895,7 +895,7 @@ def ts_tp_pg_kmeans(
         ts_data["ts_period"].append(planning_year)
         ts_data["ts_duration_of_tp"].append(1)
         ts_data["ts_num_tps"].append(num_hours)
-        ts_data["ts_scale_to_period"].append(weight * num_hours * planning_yrs)
+        ts_data["ts_scale_to_period"].append(weight * planning_yrs)
 
         tp_data["timestamp"].extend([f"{ts}_{i}" for i in range(num_hours)])
         tp_data["timeseries"].extend([ts for i in range(num_hours)])
