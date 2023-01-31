@@ -1133,6 +1133,7 @@ def timeseries(
             )
             chunk_df.append(ck_df)
     else:
+        chunk_days = 8760 / (12 * 24)
         month_hrs = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
         year_cumul = [
             744,
