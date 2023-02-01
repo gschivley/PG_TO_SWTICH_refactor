@@ -919,6 +919,7 @@ def timeseries(
             )
             chunk_df.append(ck_df)
     else:
+        chunk_days = 8760 / (12 * 24)
         month_hrs = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
         year_cumul = [
             744,
@@ -975,9 +976,11 @@ def timeseries(
 
     planning_years = settings.get("planning_years")
     max_days = settings.get("max_days")
-    sample_to_year_ratio = round(8760 / (len(sample_dates) * 24), 3)
-    max_weight = planning_years * max_days * sample_to_year_ratio
-    avg_weight = planning_years * (chunk_days - max_days) * sample_to_year_ratio
+    sample_to_year_ratio = 8760 / (len(sample_dates) * 24)
+    max_weight = round(planning_years * max_days * sample_to_year_ratio, 4)
+    avg_weight = round(
+        planning_years * (chunk_days - max_days) * sample_to_year_ratio, 4
+    )
 
     for i in range(len(timeseries_df)):
         if i % 2 == 0:
@@ -987,7 +990,7 @@ def timeseries(
     )
 
     # add in addtional years (just replace 2020 with new year)
-    addtl_yrs = case_years
+    addtl_yrs = case_years.copy()
     addtl_yrs.remove(sample_year)
     addtl_df = pd.DataFrame(columns=timeseries_df.columns)
     for y in addtl_yrs:
@@ -1044,7 +1047,29 @@ def hydro_time_tables(existing_gen, hydro_variability, period_list, timepoints_d
     """
 
     hydro_timepoints = timepoints_df
-    hydro_timepoints = hydro_timepoints.rename(columns={"timeseries": "tp_to_hts"})
+    hydro_timepoints = hydro_timepoints[["timepoint_id", "timestamp"]]
+    convert_to_hts = {
+        "01": "_M1",
+        "02": "_M2",
+        "03": "_M3",
+        "04": "_M4",
+        "05": "_M5",
+        "06": "_M6",
+        "07": "_M7",
+        "08": "_M8",
+        "09": "_M9",
+        "10": "_M10",
+        "11": "_M11",
+        "12": "_M12",
+    }
+
+    def convert(tstamp):
+        month = tstamp[4:6]
+        year = tstamp[0:4]
+        return year + convert_to_hts[month]
+
+    hydro_timepoints["tp_to_hts"] = hydro_timepoints["timestamp"].apply(convert)
+    hydro_timepoints.drop("timestamp", axis=1, inplace=True)
 
     hydro_list = [
         "Conventional Hydroelectric",
