@@ -1030,7 +1030,9 @@ def variable_cf_pg_kmeans(
         columns={"Resource": "GENERATION_PROJECT", "timepoint_id": "timepoint"}
     )
 
-    return vre_ts
+    return vre_ts.reindex(
+        columns=["GENERATION_PROJECT", "timepoint", "gen_max_capacity_factor"]
+    )
 
 
 def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.DataFrame:
@@ -1053,7 +1055,7 @@ def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.Da
     load_ts = load_curves.melt(id_vars=["TIMEPOINT"], value_name="zone_demand_mw")
     load_ts = load_ts.rename(columns={"region": "LOAD_ZONE"})
 
-    return load_ts
+    return load_ts.reindex(columns=["LOAD_ZONE", "TIMEPOINT", "zone_demand_mw"])
 
 
 def timeseries(
