@@ -1192,9 +1192,9 @@ def timeseries(
 
     planning_years = planning_year - planning_start_year
     max_days = settings.get("max_days", 1)
-    sample_to_year_ratio = (
-        round(8760 / (num_days * 24), 3) * ts_duration_of_tp * ts_num_tps
-    )
+    sample_to_year_ratio = round(
+        8760 / (num_days * 24), 3
+    )  # * ts_duration_of_tp * ts_num_tps
     max_weight = planning_years * max_days * sample_to_year_ratio
     avg_weight = planning_years * (chunk_days - max_days) * sample_to_year_ratio
 
