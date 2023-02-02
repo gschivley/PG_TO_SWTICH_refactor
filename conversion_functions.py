@@ -970,10 +970,10 @@ def hydro_timeseries_pg_kmeans(
 
     hydro_variability = hydro_variability.loc[:, hydro_df["Resource"]]
 
-    for col in hydro_variability.columns:
-        hydro_variability[col] *= hydro_df.loc[
-            hydro_df["Resource"] == col, "Existing_Cap_MW"
-        ].values[0]
+    # for col in hydro_variability.columns:
+    #     hydro_variability[col] *= hydro_df.loc[
+    #         hydro_df["Resource"] == col, "Existing_Cap_MW"
+    #     ].values[0]
     hydro_variability["timeseries"] = hydro_timepoints["tp_to_hts"].values
     hydro_ts = hydro_variability.melt(id_vars=["timeseries"])
     hydro_ts = hydro_ts.groupby(["timeseries", "Resource"], as_index=False).agg(
@@ -981,7 +981,7 @@ def hydro_timeseries_pg_kmeans(
     )
 
     hydro_ts["hydro_min_flow_mw"] = hydro_ts["Resource"].map(
-        hydro_df.set_index("Resource")["min_cap_mw"]
+        hydro_df.set_index("Resource")["Min_Power"]
     )
 
     hydro_ts["outage_rate"] = outage_rate
@@ -989,7 +989,7 @@ def hydro_timeseries_pg_kmeans(
     cols = [
         "hydro_project",
         "timeseries",
-        "outage_rate",
+        # "outage_rate",
         "hydro_min_flow_mw",
         "hydro_avg_flow_mw",
     ]
