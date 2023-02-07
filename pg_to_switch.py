@@ -100,12 +100,6 @@ def fuel_files(
     ### edit by RR
     IPM_regions = regions
     load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
-    # add in the dummy loadzone
-    load_zones.loc[len(load_zones.index)] = [
-        "loadzone",
-        0,
-        load_zones["zone_dbid"].max() + 1,
-    ]
     load_zones.to_csv(out_folder / "load_zones.csv", index=False)
 
     regional_fuel_markets = pd.DataFrame(
@@ -975,12 +969,6 @@ def balancing_tables(settings, pudl_engine, all_gen, out_folder):
         spinning_res_wind_frac=".",
         spinning_res_solar_frac=".",
     )
-
-    bal_areas
-
-    # adding in the dummy loadzone for the fuel_cost / regional_fuel_market issue
-    zone_bal_areas.loc[len(zone_bal_areas.index)] = ["loadzone", "BANC"]
-    zone_bal_areas
 
     bal_areas.to_csv(out_folder / "balancing_areas.csv", index=False)
     zone_bal_areas.to_csv(out_folder / "zone_balancing_areas.csv", index=False)
