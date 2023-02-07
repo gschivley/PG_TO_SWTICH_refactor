@@ -1190,7 +1190,7 @@ def timeseries(
 
     timeseries_df["ts_scale_to_period"] = None
 
-    planning_years = planning_year - planning_start_year
+    planning_years = planning_year - planning_start_year + 1
     max_days = settings.get("max_days", 1)
     sample_to_year_ratio = round(
         8760 / (num_days * 24), 3
