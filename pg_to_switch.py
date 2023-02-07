@@ -81,7 +81,6 @@ def fuel_files(
     fuel_emission_factors: Dict[str, float],
     out_folder: Path,
 ):
-
     fuel_cost = switch_fuel_cost_table(
         fuel_region_map,
         fuel_prices,
@@ -163,7 +162,6 @@ def gen_projects_info_file(
     out_folder: Path,
     gen_buildpre: pd.DataFrame,
 ):
-
     if settings.get("cogen_tech"):
         cogen_tech = settings["cogen_tech"]
     else:
@@ -815,8 +813,7 @@ def gen_prebuild_newbuild_info_files(
 ### edit by RR
 
 
-def other_tables(atb_data_year, out_folder):
-
+def other_tables(period_start_list, period_end_list, atb_data_year, out_folder):
     # Based on REAM
     carbon_policies_data = {
         "period": [2020, 2030, 2040, 2050],
@@ -838,9 +835,9 @@ def other_tables(atb_data_year, out_folder):
 
     # based on REAM
     periods_data = {
-        "INVESTMENT_PERIOD": [2020, 2030, 2040, 2050],
-        "period_start": [2016, 2026, 2036, 2046],
-        "period_end": [2025, 2035, 2045, 2055],
+        "INVESTMENT_PERIOD": period_end_list,
+        "period_start": period_start_list,
+        "period_end": period_end_list,
     }
     periods_table = pd.DataFrame(periods_data)
     periods_table
@@ -866,7 +863,6 @@ from statistics import mean
 
 
 def transmission_tables(settings, out_folder, pg_engine):
-
     """
     pulling in information from PowerGenome transmission notebook
     Schivley Greg, PowerGenome, (2022), GitHub repository,
@@ -956,7 +952,6 @@ from statistics import mode
 
 
 def balancing_tables(settings, pudl_engine, all_gen, out_folder):
-
     IPM_regions = settings.get("model_regions")
     bal_areas, zone_bal_areas = balancing_areas(
         pudl_engine,
@@ -1018,9 +1013,13 @@ def main(settings_file: str, results_folder: str):
 
         settings_list = []
         case_years = []
+        case_start_years = []
         for year in scenario_definitions.query("case_id == @case_id")["year"]:
-            case_years.append(year)
+            case_years.append(scenario_settings[year][case_id]["model_year"])
             settings_list.append(scenario_settings[year][case_id])
+            case_start_years.append(
+                scenario_settings[year][case_id]["model_first_planning_year"]
+            )
 
         gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
         gen_prebuild_newbuild_info_files(
@@ -1040,7 +1039,12 @@ def main(settings_file: str, results_folder: str):
             fuel_emission_factors=settings["fuel_emission_factors"],
             out_folder=case_folder,
         )
-        other_tables(atb_data_year=settings["atb_data_year"], out_folder=case_folder)
+        other_tables(
+            period_start_list=case_start_years,
+            period_end_list=case_years,
+            atb_data_year=settings["atb_data_year"],
+            out_folder=case_folder,
+        )
 
         transmission_tables(settings, case_folder, pg_engine)
 
