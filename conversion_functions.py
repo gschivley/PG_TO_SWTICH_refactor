@@ -887,7 +887,7 @@ def ts_tp_pg_kmeans(
         "timestamp": [],
         "timeseries": [],
     }
-    planning_yrs = planning_year - planning_start_year
+    planning_yrs = planning_year - planning_start_year + 1
     for p, weight in zip(representative_point, point_weights):
         num_hours = days_per_period * 24
         ts = f"{planning_year}_{p}"
