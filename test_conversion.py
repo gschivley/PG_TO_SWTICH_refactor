@@ -8,13 +8,15 @@ import math
 from powergenome.time_reduction import kmeans_time_clustering
 
 
+
 def timeseries_full(
+    load_curves,
     planning_year,
     planning_start_year,
     settings,
 ):  # 20.2778, 283.8889
     """Create timeseries and timepoints tables when using yearly data with 8760 hours
-
+    Apply this function reduce_time_domain: False & full_time_domain: True in settings
     Parameters
     ----------
     planning_periods : List[int]
@@ -47,6 +49,7 @@ def timeseries_full(
         sample_dates.remove(leap_yr)  ### why remove Feb 29th? --RR
     num_days = len(sample_dates)
     sample_to_year_ratio = 8760 / (num_days * 24)
+    planning_years = settings.get("planning_years")
 
     timeseries_df = pd.DataFrame()
     timeseries_df["timeseries"] = [
@@ -55,7 +58,7 @@ def timeseries_full(
     timeseries_df["ts_period"] = [x[:4] for x in sample_dates]
     timeseries_df["ts_duration_of_tp"] = 1  # each hour as one timepoint
     timeseries_df["ts_num_tps"] = 24  # 24 hours
-    timeseries_df["ts_scale_to_period"] = sample_to_year_ratio
+    timeseries_df["ts_scale_to_period"] = planning_years * sample_to_year_ratio
 
     timeseries_dates = timeseries_df["timeseries"].to_list()
     timestamp_interval = list()
