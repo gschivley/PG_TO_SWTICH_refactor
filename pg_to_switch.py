@@ -23,6 +23,8 @@ from powergenome.util import (
     load_settings,
     check_settings,
 )
+
+from powergenome.time_reduction import kmeans_time_clustering
 from powergenome.eia_opendata import fetch_fuel_prices
 import geopandas as gpd
 from powergenome.generators import *
@@ -47,11 +49,17 @@ from conversion_functions import (
     load_zones_table,
     fuel_market_tables,
     timeseries,
+    timeseries_full,
     graph_timestamp_map_table,
     loads_table,
     variable_capacity_factors_table,
     transmission_lines_table,
     balancing_areas,
+    ts_tp_pg_kmeans,
+    hydro_timepoints_pg_kmeans,
+    hydro_timeseries_pg_kmeans,
+    variable_cf_pg_kmeans,
+    load_pg_kmeans,
 )
 
 from powergenome.load_profiles import (
@@ -612,19 +620,29 @@ def gen_prebuild_newbuild_info_files(
     retired_ids = retired["GENERATION_PROJECT"].to_list()
 
     # newbuild options
-    df_list = []
+    periods_dict = {
+        "new_gen": [],
+        "load_curves": [],
+    }
+    planning_periods = []
+    planning_period_start_yrs = []
     for settings in settings_list:
         gc.settings = settings
-        new_gen = gc.create_new_generators()
-        new_gen["Resource"] = new_gen["Resource"].str.rstrip("_")
-        new_gen["technology"] = new_gen["technology"].str.rstrip("_")
-        new_gen["build_year"] = settings["model_year"]
-        new_gen["GENERATION_PROJECT"] = new_gen[
+        period_ng = gc.create_new_generators()
+        period_ng["Resource"] = period_ng["Resource"].str.rstrip("_")
+        period_ng["technology"] = period_ng["technology"].str.rstrip("_")
+        period_ng["build_year"] = settings["model_year"]
+        period_ng["GENERATION_PROJECT"] = period_ng[
             "Resource"
         ]  # + f"_{settings['model_year']}"
-        df_list.append(new_gen)
+        periods_dict["new_gen"].append(period_ng)
 
-    newgens = pd.concat(df_list, ignore_index=True)
+        period_lc = make_final_load_curves(pg_engine, settings)
+        periods_dict["load_curves"].append(period_lc)
+        planning_periods.append(settings["model_year"])
+        planning_period_start_yrs.append(settings["model_first_planning_year"])
+
+    newgens = pd.concat(periods_dict["new_gen"], ignore_index=True)
 
     build_yr_list = gen_build_with_id["build_year"].to_list()
     # using gen_build_with_id because it has plants that were removed for the final gen_build_pred. (ie. build year=2020)
@@ -652,51 +670,156 @@ def gen_prebuild_newbuild_info_files(
         gc.fuel_prices, complete_gens, gc.settings, out_folder, gen_buildpre
     )
 
-    ### edit by RR
-    load_curves = make_final_load_curves(pg_engine, settings_list[0])
-    timeseries_df, timepoints_df, timestamp_interval = timeseries(
-        load_curves,
-        case_years,
-        settings=settings,
-    )
+    ts_list = []
+    tp_list = []
+    hts_list = []
+    htp_list = []
+    load_list = []
+    vcf_list = []
+    gts_map_list = []
+    timepoint_start = 1
+    for settings, period_lc, period_ng in zip(
+        settings_list, periods_dict["load_curves"], periods_dict["new_gen"]
+    ):
+        period_all_gen = pd.concat([existing_gen, period_ng])
+        period_all_gen_variability = make_generator_variability(period_all_gen)
+        period_all_gen_variability.columns = period_all_gen["Resource"]
+        if settings.get("reduce_time_domain") is True:
+            for p in ["time_domain_periods", "time_domain_days_per_period"]:
+                assert p in settings.keys()
 
-    # create lists and dictionary for later use
-    timepoints_timestamp = timepoints_df["timestamp"].to_list()  # timestamp list
-    timepoints_tp_id = timepoints_df["timepoint_id"].to_list()  # timepoint_id list
-    timepoints_dict = dict(
-        zip(timepoints_timestamp, timepoints_tp_id)
-    )  # {timestamp: timepoint_id}
+            # results is a dict with keys "resource_profiles" (gen_variability), "load_profiles",
+            # "time_series_mapping" (maps clusters sequentially to potential periods in year),
+            # "ClusterWeights", etc. See PG for full details.
+            results, representative_point, weights = kmeans_time_clustering(
+                resource_profiles=period_all_gen_variability,
+                load_profiles=period_lc,
+                days_in_group=settings["time_domain_days_per_period"],
+                num_clusters=settings["time_domain_periods"],
+                include_peak_day=settings.get("include_peak_day", True),
+                load_weight=settings.get("demand_weight_factor", 1),
+                variable_resources_only=settings.get("variable_resources_only", True),
+            )
 
-    graph_timestamp_map = graph_timestamp_map_table(timeseries_df, timestamp_interval)
-    graph_timestamp_map
+            period_lc = results["load_profiles"]
+            period_variability = results["resource_profiles"]
+
+            timeseries_df, timepoints_df = ts_tp_pg_kmeans(
+                representative_point["slot"],
+                weights,
+                settings["time_domain_days_per_period"],
+                settings["model_year"],
+                settings["model_first_planning_year"],
+            )
+            timepoints_df["timepoint_id"] = range(
+                timepoint_start, timepoint_start + len(timepoints_df)
+            )
+            hydro_timepoints_df = hydro_timepoints_pg_kmeans(timepoints_df)
+            hydro_timeseries_table = hydro_timeseries_pg_kmeans(
+                period_all_gen,
+                period_variability.loc[
+                    :, period_all_gen.loc[period_all_gen["HYDRO"] == 1, "Resource"]
+                ],
+                hydro_timepoints_df,
+            )
+
+            vcf = variable_cf_pg_kmeans(
+                period_all_gen, period_variability, timepoints_df
+            )
+
+            loads = load_pg_kmeans(period_lc, timepoints_df)
+            timepoint_start = timepoints_df["timepoint_id"].max() + 1
+        else:
+            if settings.get("full_time_domain") is True:
+                timeseries_df, timepoints_df, timestamp_interval = timeseries_full(
+                    period_lc,
+                    settings["model_year"],
+                    settings["model_first_planning_year"],
+                    settings=settings,
+                )
+            else:
+                timeseries_df, timepoints_df, timestamp_interval = timeseries(
+                    period_lc,
+                    settings["model_year"],
+                    settings["model_first_planning_year"],
+                    settings=settings,
+                )
+
+            timepoints_df["timepoint_id"] = range(
+                timepoint_start, timepoint_start + len(timepoints_df)
+            )
+            timepoint_start = timepoints_df["timepoint_id"].max() + 1
+
+            # create lists and dictionary for later use
+            timepoints_timestamp = timepoints_df[
+                "timestamp"
+            ].to_list()  # timestamp list
+            timepoints_tp_id = timepoints_df[
+                "timepoint_id"
+            ].to_list()  # timepoint_id list
+            timepoints_dict = dict(
+                zip(timepoints_timestamp, timepoints_tp_id)
+            )  # {timestamp: timepoint_id}
+            hydro_timepoints_df, hydro_timeseries_table = hydro_time_tables(
+                period_all_gen,
+                period_all_gen_variability,
+                timepoints_df,
+                settings["model_year"],
+            )
+            hydro_timepoints_df
+
+            # hydro_timeseries_table = hydro_timeseries(
+            #     existing_gen, hydro_variability_new, planning_periods
+            # )
+
+            loads, loads_with_year_hour = loads_table(
+                period_lc, timepoints_timestamp, timepoints_dict, settings["model_year"]
+            )
+            # for fuel_cost and regional_fuel_market issue
+            dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
+            dummy_df.insert(0, "LOAD_ZONE", "loadzone")
+            dummy_df.insert(2, "zone_demand_mw", 0)
+            loads = loads.append(dummy_df)
+
+            year_hour = loads_with_year_hour["year_hour"].to_list()
+
+            vcf = variable_capacity_factors_table(
+                period_all_gen_variability,
+                year_hour,
+                timepoints_dict,
+                period_all_gen,
+                settings["model_year"],
+            )
+
+            graph_timestamp_map = graph_timestamp_map_table(
+                timeseries_df, timestamp_interval
+            )
+            gts_map_list.append(graph_timestamp_map)
+
+        ts_list.append(timeseries_df)
+        tp_list.append(timepoints_df)
+        htp_list.append(hydro_timepoints_df)
+        hts_list.append(hydro_timeseries_table)
+        load_list.append(loads)
+        vcf_list.append(vcf)
+
+    if gts_map_list:
+        graph_timestamp_map = pd.concat(gts_map_list, ignore_index=True)
+        graph_timestamp_map.to_csv(out_folder / "graph_timestamp_map.csv", index=False)
+
+    timeseries_df = pd.concat(ts_list, ignore_index=True)
+    timepoints_df = pd.concat(tp_list, ignore_index=True)
+    hydro_timepoints_df = pd.concat(htp_list, ignore_index=True)
+    hydro_timeseries_table = pd.concat(hts_list, ignore_index=True)
+    loads = pd.concat(load_list, ignore_index=True)
+    vcf = pd.concat(vcf_list, ignore_index=True)
+
     timeseries_df.to_csv(out_folder / "timeseries.csv", index=False)
     timepoints_df.to_csv(out_folder / "timepoints.csv", index=False)
-    graph_timestamp_map.to_csv(out_folder / "graph_timestamp_map.csv", index=False)
-
-    period_list = ["2020", "2030", "2040", "2050"]
-    loads, loads_with_year_hour = loads_table(
-        load_curves, timepoints_timestamp, timepoints_dict, period_list
-    )
-    # for fuel_cost and regional_fuel_market issue
-    dummy_df = pd.DataFrame({"TIMEPOINT": timepoints_tp_id})
-    dummy_df.insert(0, "LOAD_ZONE", "loadzone")
-    dummy_df.insert(2, "zone_demand_mw", 0)
-    loads = loads.append(dummy_df)
-
-    year_hour = loads_with_year_hour["year_hour"].to_list()
-    all_gen_variability = make_generator_variability(all_gen)
-    vcf = variable_capacity_factors_table(
-        all_gen_variability, year_hour, timepoints_dict, all_gen, case_years
-    )
+    hydro_timepoints_df.to_csv(out_folder / "hydro_timepoints.csv", index=False)
 
     balancing_tables(settings, pudl_engine, all_gen_units, out_folder)
-    hydro_timepoints, hydro_timeseries = hydro_time_tables(
-        existing_gen, hydro_variability_new, period_list, timepoints_df
-    )
-    hydro_timepoints.to_csv(out_folder / "hydro_timepoints.csv", index=False)
-
-    hydro_timeseries.to_csv(out_folder / "hydro_timeseries.csv", index=False)
-
+    hydro_timeseries_table.to_csv(out_folder / "hydro_timeseries.csv", index=False)
     loads.to_csv(out_folder / "loads.csv", index=False)
     vcf.to_csv(out_folder / "variable_capacity_factors.csv", index=False)
     ###

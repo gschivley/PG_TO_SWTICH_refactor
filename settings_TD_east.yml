@@ -10,13 +10,13 @@
 # profiles, etc
 # - "model_first_planning_year": The first year of each planning period. Capex for
 # new-build generators from ATB are an average of costs from first to last (inclusive).
-model_year: [2020, 2030, 2040, 2050]
-model_first_planning_year: [2020, 2021, 2031, 2041]
+model_year: [2030, 2040, 2050]
+model_first_planning_year: [2021, 2031, 2041]
 
 
 # sample_dates: sample_dates.csv # list your base year date in this csv file under the inputs_folder if the base year is not a whole year(365 days)
 # chunk_days: #specify number of days amoung which to find the max/mean load if not on a monthly base.
-planning_years: 10
+# planning_years: 10
 max_days: 2
 ts_duration_of_tp: 4
 ts_num_tps: 6
@@ -50,12 +50,13 @@ reserves_fn: Reserves.csv
 # regional_load_includes_demand_response: true
 
 # Time clustering/reduction parameters
-reduce_time_domain: false # If the generator and load profiles should be clustered. TAYLOR - SET TO FALSE
+reduce_time_domain: False # If the generator and load profiles should be clustered. TAYLOR - SET TO FALSE
 time_domain_periods: 4 # The number of periods/clusters
 time_domain_days_per_period: 5 # The number of 24 hour days in each period/cluster
 include_peak_day: true # If the system-wide peak load days should always be included
 demand_weight_factor: 1 # Demand profiles are scaled from 0-1, then scaled up using this value.
 
+full_time_domain: True
 
 # List the method to calculate total distributed generation in each region (not all
 # regions need to be listed here). Both methods use a normalized profile in the file
@@ -315,25 +316,25 @@ settings_management:
   2020:
     time_series:
       full:
-        reduce_time_domain: false
+        reduce_time_domain: FALSE
       sampled:
         genx_settings_folder: genx_settings_4x5
   2030:
     time_series:
       full:
-        reduce_time_domain: false
+        reduce_time_domain: FALSE
       sampled:
         genx_settings_folder: genx_settings_4x5
   2040:
     time_series:
       full:
-        reduce_time_domain: false
+        reduce_time_domain: FALSE
       sampled:
         genx_settings_folder: genx_settings_4x5
   2050:
     time_series:
       full:
-        reduce_time_domain: false
+        reduce_time_domain: False
       sampled:
         genx_settings_folder: genx_settings_4x5
 ###########################################
@@ -393,9 +394,9 @@ model_regions:
   # - MIS_MO
   # - MIS_WOTA
   # - MIS_WUMS
-  # - NENG_CT
-  # - NENG_ME
-  # - NENGREST
+  - NENG_CT
+  - NENG_ME
+  - NENGREST
   # - NY_Z_A
   # - NY_Z_B
   # - NY_Z_C&E
@@ -423,22 +424,22 @@ model_regions:
   # - SPP_SPS
   # - SPP_WAUE
   # - SPP_WEST
-  - WEC_BANC
-  - WEC_CALN
-  - WEC_LADW
-  - WEC_SDGE
-  - WECC_AZ
-  - WECC_CO
-  - WECC_ID
-  - WECC_IID
-  - WECC_MT
-  - WECC_NM
-  - WECC_NNV
-  - WECC_PNW
-  - WECC_SCE
-  - WECC_SNV
-  - WECC_UT
-  - WECC_WY
+  # - WEC_BANC
+  # - WEC_CALN
+  # - WEC_LADW
+  # - WEC_SDGE
+  # - WECC_AZ
+  # - WECC_CO
+  # - WECC_ID
+  # - WECC_IID
+  # - WECC_MT
+  # - WECC_NM
+  # - WECC_NNV
+  # - WECC_PNW
+  # - WECC_SCE
+  # - WECC_SNV
+  # - WECC_UT
+  # - WECC_WY
 
 
 # Comment out this setting if no aggregated regions are included in the study.
@@ -514,8 +515,8 @@ regional_no_grouping: ~
 alt_num_clusters: ~
 #   NENG_ME:
 #     Natural Gas Fired Combustion Turbine: 1
-  # MIS_D_MS:
-  #   Conventional Hydroelectric: 0
+    # MIS_D_MS:
+    #   Conventional Hydroelectric: 0
 
 # CAPACITY FACTOR
 # Calculate the capacity factor of technology types listed here. If derate_capacity is
