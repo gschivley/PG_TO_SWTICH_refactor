@@ -50,13 +50,13 @@ reserves_fn: Reserves.csv
 # regional_load_includes_demand_response: true
 
 # Time clustering/reduction parameters
-reduce_time_domain: False # If the generator and load profiles should be clustered. TAYLOR - SET TO FALSE
-time_domain_periods: 4 # The number of periods/clusters
-time_domain_days_per_period: 5 # The number of 24 hour days in each period/cluster
+reduce_time_domain: True # If the generator and load profiles should be clustered. TAYLOR - SET TO FALSE
+time_domain_periods: 5 # The number of periods/clusters
+time_domain_days_per_period: 7 # The number of 24 hour days in each period/cluster
 include_peak_day: true # If the system-wide peak load days should always be included
 demand_weight_factor: 1 # Demand profiles are scaled from 0-1, then scaled up using this value.
 
-full_time_domain: True
+full_time_domain: False
 
 # List the method to calculate total distributed generation in each region (not all
 # regions need to be listed here). Both methods use a normalized profile in the file
@@ -316,25 +316,25 @@ settings_management:
   2020:
     time_series:
       full:
-        reduce_time_domain: FALSE
+        reduce_time_domain: True
       sampled:
         genx_settings_folder: genx_settings_4x5
   2030:
     time_series:
       full:
-        reduce_time_domain: FALSE
+        reduce_time_domain: True
       sampled:
         genx_settings_folder: genx_settings_4x5
   2040:
     time_series:
       full:
-        reduce_time_domain: FALSE
+        reduce_time_domain: True 
       sampled:
         genx_settings_folder: genx_settings_4x5
   2050:
     time_series:
       full:
-        reduce_time_domain: False
+        reduce_time_domain: True
       sampled:
         genx_settings_folder: genx_settings_4x5
 ###########################################

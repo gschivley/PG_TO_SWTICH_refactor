@@ -8,7 +8,6 @@ import math
 from powergenome.time_reduction import kmeans_time_clustering
 
 
-
 def timeseries_full(
     load_curves,
     planning_year,
