@@ -10,7 +10,7 @@ Clone this repository to your local machine and copy this folder into your own p
 
 ## Follow the steps below to get the code run.
 
-1. Change the settings file as your own needs, check the details of settings components Here.
+1. Change the settings file as your own needs, check the details of settings components in [Wiki](https://github.com/JennyZheng-uh/PG_TO_SWTICH_refactor.wiki.git).
 2. Navigate to your project directory and run the command:
 ```
  python pg_to_switch.py settings_TD_east.yml test_full
