@@ -311,12 +311,23 @@ def gen_build_predetermined(
     # plant_unit_tech = plant_unit_tech.drop_duplicates(subset=["plant_pudl_id"])
     # plant_unit_tech = plant_unit_tech.set_index("plant_pudl_id")["technology"]
     # pg_build["technology"] = pg_build["plant_pudl_id"].map(plant_unit_tech)
-    pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
+    # pg_build["retirement_age"] = pg_build["technology"].map(retirement_ages)
+    # pg_build["retirement_age"] = [[float(i) for i in pg_build["retirement_age"]]]
+
     # pg_build["retirement_age"] = [
     #     val
     #     for key, val in retirement_ages.items()
     #     if pg_build["technology"].str.contains(key, case=False)
     # ]
+    retirement_ages = {k.lower(): v for k, v in retirement_ages.items()}
+    pg_build["technology"] = pg_build["technology"].str.lower()
+    pg_build["retirement_age"] = pg_build["technology"].apply(
+        lambda x: [retirement_ages[i] for i in retirement_ages if i in x]
+    )
+    pg_build["retirement_age"] = pg_build["retirement_age"].apply(
+        lambda x: "".join(map(str, x))
+    )
+    pg_build["retirement_age"] = pg_build["retirement_age"].astype(float)
 
     pg_build["calc_retirement_year"] = (
         pg_build["build_year"] + pg_build["retirement_age"]
@@ -655,15 +666,23 @@ def generation_projects_info(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    gen_project_info.loc[
-        gen_project_info["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
-    ] = True
-    gen_project_info.loc[
-        gen_project_info["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
-    ] = True
     # gen_project_info.loc[
-    #     gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
+    #     gen_project_info["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
     # ] = True
+    # gen_project_info.loc[
+    #     gen_project_info["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
+    # ] = True
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
+    ] = True
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("solar", case=False),
+        "gen_is_variable",
+    ] = True
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("wind", case=False),
+        "gen_is_variable",
+    ] = True
 
     gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].fillna(
         False
@@ -697,8 +716,11 @@ def generation_projects_info(
     gen_project_info["gen_storage_energy_to_power_ratio"] = "."
 
     # retirement ages based on settings file still need to be updated
-    gen_project_info["gen_max_age"] = gen_project_info["technology"].map(retirement_age)
-
+    # gen_project_info["gen_max_age"] = gen_project_info["technology"].map(retirement_age)
+    for tech, age in retirement_age.items():
+        gen_project_info.loc[
+            gen_project_info["technology"].str.contains(tech, case=False), "gen_max_age"
+        ] = age
     # Tell user about missing retirement ages
     if not gen_project_info.query("gen_max_age.isna()").empty:
         missing_ret_tech = gen_project_info.query("gen_max_age.isna()")[
@@ -1067,6 +1089,33 @@ def load_pg_kmeans(load_curves: pd.DataFrame, timepoints: pd.DataFrame) -> pd.Da
     return load_ts.reindex(columns=["LOAD_ZONE", "TIMEPOINT", "zone_demand_mw"])
 
 
+def graph_timestamp_map_kmeans(timepoints_df):
+    """
+    Create the graph_timestamp_map table based on REAM Scenario 178
+    Input:
+        timeseries_df, timepoints_df: the SWITCH timeseries table
+    Output columns:
+        * timestamp: dates based on the timeseries table
+        * time_row: the period decade year based on the timestamp
+        * time_column: format: yyyymmdd. Using 2012 because that is the year data is based on.
+    """
+
+    timepoints_df_copy = timepoints_df.copy()
+    graph_timeseries_map = pd.DataFrame(columns=["timestamp", "time_row", "timeseries"])
+    graph_timeseries_map["timestamp"] = timepoints_df_copy["timestamp"]
+    graph_timeseries_map["timeseries"] = timepoints_df_copy["timeseries"]
+    graph_timeseries_map["time_row"] = [
+        x[0] for x in graph_timeseries_map["timestamp"].str.split("_")
+    ]
+
+    # using 2012 for financial year
+    graph_timeseries_map["time_column"] = graph_timeseries_map["timeseries"].apply(
+        lambda x: str(2012) + x[5:]
+    )
+
+    return graph_timeseries_map
+
+
 def timeseries(
     load_curves,
     planning_year,
@@ -1286,40 +1335,35 @@ def timeseries_full(
     if leap_yr in sample_dates:
         sample_dates.remove(leap_yr)  ### why remove Feb 29th? --RR
     num_days = len(sample_dates)
+    num_hours = 24 * num_days
     sample_to_year_ratio = 8760 / (num_days * 24)
     planning_yrs = planning_year - planning_start_year + 1
 
     timeseries_df = pd.DataFrame()
-    timeseries_df["timeseries"] = [
-        x[:4] + "_" + x[:4] + "-" + x[4:6] + "-" + x[6:8] for x in sample_dates
-    ]
-    timeseries_df["ts_period"] = [x[:4] for x in sample_dates]
-    timeseries_df["ts_duration_of_tp"] = 1  # each hour as one timepoint
-    timeseries_df["ts_num_tps"] = 24  # 24 hours
-    timeseries_df["ts_scale_to_period"] = planning_yrs * sample_to_year_ratio
+    ts = f"{sample_year}_{sample_year}-full"
+    timeseries_df["timeseries"] = [ts]
+    timeseries_df["ts_period"] = [f"{sample_year}"]
+    timeseries_df["ts_duration_of_tp"] = [1]  # each hour as one timepoint
+    timeseries_df["ts_num_tps"] = [num_hours]
+    timeseries_df["ts_scale_to_period"] = [planning_yrs * sample_to_year_ratio]
 
-    timeseries_dates = timeseries_df["timeseries"].to_list()
     timestamp_interval = list()
     for i in range(24):
         s_interval = i
         stamp_interval = str(f"{s_interval:02d}")
         timestamp_interval.append(stamp_interval)
 
-    timepoint_id = list(range(1, len(timeseries_dates) + 1))
-    timestamp = [x[:4] + x[10:12] + x[13:] for x in timeseries_dates]
-
-    column_list = ["timepoint_id", "timestamp", "timeseries"]
-    timepoints_df = pd.DataFrame(columns=column_list)
-    for i in timestamp_interval:
-        timestamp_interval = [x + i for x in timestamp]
-        df_data = np.array([timepoint_id, timestamp_interval, timeseries_dates]).T
-        df = pd.DataFrame(df_data, columns=column_list)
-        timepoints_df = timepoints_df.append(df)
-
+    timepoints_df = pd.DataFrame()
+    timepoints_df["timeseries"] = [ts for i in range(num_hours)]
     timepoints_df["timepoint_id"] = range(
         1, len(timepoints_df["timeseries"].to_list()) + 1
     )
 
+    timepoints_df["timestamp"] = [
+        f"{d}{i}" for d in sample_dates for i in timestamp_interval
+    ]
+
+    timepoints_df = timepoints_df[["timepoint_id", "timestamp", "timeseries"]]
     return timeseries_df, timepoints_df, timestamp_interval
 
 
@@ -1517,7 +1561,7 @@ def loads_table(load_curves, timepoints_timestamp, timepoints_dict, planning_yea
         loads_initial = loads_initial.append(df)
 
     # convert timepoints to date of the year
-    start = pd.to_datetime("2021-01-01 0:00")  # use 2021 due to 2020 being a leap year
+    start = pd.to_datetime(f"2021-01-01 0:00")  # use 2021 due to 2020 being a leap year
     loads_initial["date"] = loads_initial["year_hour"].apply(
         lambda x: start + pd.to_timedelta(x, unit="H")
     )
@@ -1529,14 +1573,8 @@ def loads_table(load_curves, timepoints_timestamp, timepoints_dict, planning_yea
     # create timestamp
     date_list = loads_initial["reformat"].to_list()
 
-    # loop through for each period
-    # df_list = list()
-    # for p in period_list:
-    #     df = loads_initial.copy()
     updated_dates = [f"{planning_year}" + x[4:] for x in date_list]
     loads_initial["timestamp"] = updated_dates
-    #     df_list.append(df)
-    # loads = pd.concat(df_list)
 
     # filter to correct timestamps for timepoints
     loads = loads_initial.loc[loads_initial["timestamp"].isin(timepoints_timestamp)]
@@ -1571,8 +1609,10 @@ def variable_capacity_factors_table(
         value_name="gen_max_capacity_factor",
     )
     # reduce variability to just the hours of the year that have a timepoint
-    v_c_f = v_c_f.loc[v_c_f["year_hour"].isin(year_hour), :]
+    # needs to start with 1 to allign with year_hour
+    year_hour = [x - 1 for x in year_hour]
 
+    v_c_f = v_c_f.loc[v_c_f["year_hour"].isin(year_hour), :]
     mod_vcf = v_c_f.copy()
     # get the dates from hour of the year
     start = pd.to_datetime("2021-01-01 0:00")  # 2020 is a leap year
@@ -1599,6 +1639,10 @@ def variable_capacity_factors_table(
     # filter to final columns
     var_cap_fac = var_cap_fac[
         ["GENERATION_PROJECT", "timepoint", "gen_max_capacity_factor"]
+    ]
+    searchfor = ["pv", "solar", "wind"]
+    var_cap_fac = var_cap_fac[
+        var_cap_fac["GENERATION_PROJECT"].str.contains("|".join(searchfor), case=False)
     ]
 
     return var_cap_fac
