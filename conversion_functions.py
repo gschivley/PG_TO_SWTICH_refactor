@@ -629,6 +629,7 @@ def generation_projects_info(
             "Eff_Up",
             "Eff_Down",
             "VRE",
+            "gen_is_variable",
             "Max_Cap_MW",
             "gen_energy_source",
             "gen_is_cogen",
@@ -666,28 +667,9 @@ def generation_projects_info(
     def Filter(list1, list2):
         return [n for n in list1 if any(m in n for m in list2)]
 
-    # gen_project_info.loc[
-    #     gen_project_info["gen_energy_source"].str.contains("Wind"), "gen_is_variable"
-    # ] = True
-    # gen_project_info.loc[
-    #     gen_project_info["gen_energy_source"].str.contains("Solar"), "gen_is_variable"
-    # ] = True
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("PV"), "gen_is_variable"
-    ] = True
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("solar", case=False),
-        "gen_is_variable",
-    ] = True
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("wind", case=False),
-        "gen_is_variable",
-    ] = True
-
-    gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].fillna(
-        False
+    gen_project_info["gen_is_variable"] = gen_project_info["gen_is_variable"].astype(
+        bool
     )
-
     # gen_storage_efficiency and gen_store_to_release_ratio: battery info based on REAM
     battery = set(Filter(technology, ["Battery", "Batteries", "Storage"]))
     gen_project_info.loc[
@@ -739,7 +721,7 @@ def generation_projects_info(
     # it was from 'Existing_Cap_MW' only, now takes the max of "Existing_Cap_MW" and "Max_Cap_MW" for new renewables.
     gen_project_info["gen_capacity_limit_mw"] = gen_project_info["Existing_Cap_MW"]
     gen_project_info.loc[
-        gen_project_info["VRE"] == 1, "gen_capacity_limit_mw"
+        gen_project_info["gen_is_variable"] == True, "gen_capacity_limit_mw"
     ] = gen_project_info[["Existing_Cap_MW", "Max_Cap_MW"]].max(axis=1)
 
     # rename columns
@@ -1036,7 +1018,7 @@ def variable_cf_pg_kmeans(
     Parameters
     ----------
     all_gens : pd.DataFrame
-        All resources. Must have the columns "Resource" and "VRE".
+        All resources. Must have the columns "Resource" and "gen_is_variable".
     all_gen_variability : pd.DataFrame
         Wide dataframe with hourly capacity factors of all generators.
     timepoints : pd.DataFrame
@@ -1049,7 +1031,7 @@ def variable_cf_pg_kmeans(
         "gen_max_capacity_factor"
     """
 
-    vre_gens = all_gens.loc[all_gens["VRE"] == 1, "Resource"]
+    vre_gens = all_gens.loc[all_gens["gen_is_variable"] == 1, "Resource"]
     vre_variability = all_gen_variability[vre_gens]
     vre_variability["timepoint_id"] = timepoints["timepoint_id"].values
     vre_ts = vre_variability.melt(
@@ -1630,7 +1612,7 @@ def variable_capacity_factors_table(
     mod_vcf["timepoint"] = mod_vcf["timestamp"].apply(lambda x: timepoints_dict[x])
     mod_vcf.drop(["year_hour", "date", "reformat", "timestamp"], axis=1, inplace=True)
     # only get all_gen plants that are wind or solar
-    all_gen = all_gen.loc[all_gen["VRE"] == 1, :]
+    all_gen = all_gen.loc[all_gen["gen_is_variable"] == 1, :]
 
     var_cap_fac = mod_vcf.loc[
         mod_vcf["GENERATION_PROJECT"].isin(all_gen["Resource"]), :
