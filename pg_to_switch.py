@@ -245,7 +245,7 @@ def gen_projects_info_file(
             "OffShoreWind_Class1_Moderate_fixed_1": "Wind",
             "Landbased Wind Turbine": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
             "LandbasedWind_Class1_Moderate": "Wind",  ## add by RR because run into an erro of KeyError: 'LandbasedWind_Class1_Moderate_'
-            "landbasedwind_class3_moderate":"Wind",  ## add by RR
+            "landbasedwind_class3_moderate": "Wind",  ## add by RR
             "Small Hydroelectric": "Water",
             "NaturalGas_CCCCSAvgCF_Conservative": "Naturalgas",
             "NaturalGas_CCAvgCF_Moderate": "Naturalgas",
@@ -476,10 +476,10 @@ def gen_prebuild_newbuild_info_files(
     all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
     all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     # all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
-    existing_gen = all_gen.loc[
-        all_gen["plant_id_eia"].notna(), :
-    ]  # gc.create_region_technology_clusters()
-
+    # existing_gen = all_gen.loc[
+    #     all_gen["plant_id_eia"].notna(), :
+    # ]  # gc.create_region_technology_clusters()
+    existing_gen = all_gen.loc[all_gen["Existing_Cap_MW"] > 0, :]
     data_years = gc.settings.get("data_years", [])
     if not isinstance(data_years, list):
         data_years = [data_years]
