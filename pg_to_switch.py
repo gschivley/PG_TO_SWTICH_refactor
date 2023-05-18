@@ -985,7 +985,7 @@ def transmission_tables(settings, out_folder, pg_engine):
     trans_params_table = pd.DataFrame(
         {
             "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,
-            "trans_lifetime_yrs": 20,
+            "trans_lifetime_yrs": 60,  # it was 20, now change to 60 for national_emm comparison by RR
             "trans_fixed_om_fraction": 0.03,
         },
         index=[0],

@@ -3139,6 +3139,7 @@ model_tag_names:
   - Retro2_Source
   - Retro2_Efficiency
   - Retro2_Inv_Cost_per_MWyr
+  - gen_is_variable
 
 default_model_tag: 0
 
@@ -3164,7 +3165,7 @@ model_tag_values:
     AdvNuclear_: 1
     Hydrogen_: 1
     CandGeothermal_: 1
-    Nuclear_: 1
+    Nuclear_Nuclear: 1
   THERM: 
     Conventional Steam Coal: 1
     Natural Gas Fired Combined Cycle: 1
@@ -3176,8 +3177,10 @@ model_tag_values:
     NaturalGas_: 1 # Candidates
     AdvNuclear_: 1 # Candidates
     Hydrogen_: 1 # Candidates
-  VRE:
     Geothermal: 1
+  VRE:
+    # Geothermal: 1
+    Distributed_Generation: 1
     Onshore Wind Turbine: 1
     Offshore Wind Turbine: 1
     Solar Photovoltaic: 1
@@ -3185,7 +3188,17 @@ model_tag_values:
     OffshoreWind_: 1 # Candidates
     UtilityPV_: 1 # Candidates
     CandGeothermal_: 1 # Candidates
+  gen_is_variable: # Used with Switch
+    Distributed_Generation: 1
+    Onshore Wind Turbine: 1
+    Offshore Wind Turbine: 1
+    Solar Photovoltaic: 1
+    LandbasedWind_: 1 # Candidates
+    OffshoreWind_: 1 # Candidates
+    UtilityPV_: 1 # Candidates
   Num_VRE_Bins:
+    # Geothermal: 1
+    Distributed_Generation: 1
     Onshore Wind Turbine: 1
     Offshore Wind Turbine: 1
     Solar Photovoltaic: 1
@@ -3195,7 +3208,7 @@ model_tag_values:
   MUST_RUN:
     Small Hydroelectric: 1
     Biomass: 1
-    Distributed_Generation: 1
+    # Distributed_Generation: 1
   STOR:
     Hydroelectric Pumped Storage: 1
     Batteries: 1 # added on Aug 16 2022 by Qingyu
@@ -5200,7 +5213,6 @@ MinCapReq: ~
   #   min_mw: 10000
 
 
-
 # REGIONS
 # Select the regions and any regional aggregations that should be performed.
 # This currenly only works for IPM regions, either as the regions used in GenX or as
@@ -5275,8 +5287,8 @@ target_usd_year: 2020
 # model_year: [2025, 2030, 2035, 2040, 2045, 2050]
 # model_first_planning_year: [2023, 2026, 2031, 2036, 2041, 2046]
 
-model_year: [2040]
-model_first_planning_year: [2031]
+model_year: [2050]
+model_first_planning_year: [2041]
 # HOURS OFFSET FROM UTC
 # All time profile data are stored in UTC. Provide an offset for the model timezone.
 # US East cost is UTC-5, Pacific is UTC-8
@@ -5848,7 +5860,7 @@ flexible_demand_resources:
 # The location and name of additional input files needed to create outputs
 input_folder: CONUS_extra_inputs # Subfolder directly below the location of this settings file
 case_id_description_fn: conus_case_id_description.csv # Match the case_id with longer case_name
-scenario_definitions_fn: conus_scenario_inputs2040.csv # Define policy/cost scenarios for each case
+scenario_definitions_fn: conus_scenario_inputs2050.csv # Define policy/cost scenarios for each case
 emission_policies_fn: conus_rps_ces_emission_limits.csv # Emission policies for each model_year/region/case_id
 capacity_limit_spur_fn: conus_resource_capacity_spur.csv # Max capacity and spur line distance for each renewable resource
 # region_wind_pv_cap_fn: existing_wind_pv_capacity.csv # Only use if your data is more up-to-date than PUDL
