@@ -1798,8 +1798,23 @@ def balancing_areas(
             * Load_zone: IPM region
             * balancing_area
     """
-    # get table from PUDL that has  balancing_authority_code_eia
-    plants_entity_eia = pd.read_sql_table("plants_entity_eia", pudl_engine)
+    import pudl
+
+    if pudl.__version__ <= "0.6.0":
+        # get table from PUDL that has  balancing_authority_code_eia
+        plants_entity_eia = pd.read_sql_table("plants_entity_eia", pudl_engine)
+    else:
+        plants_eia = pd.read_sql_table(
+            "plants_eia860",
+            pudl_engine,
+            parse_dates=["report_date"],
+            columns=["report_date", "plant_id_eia", "balancing_authority_code_eia"],
+        )
+        plants_entity_eia = plants_eia.sort_values(
+            "report_date", ascending=False
+        ).drop_duplicates(
+            subset=["plant_id_eia", "balancing_authority_code_eia"], keep="first"
+        )
     # dataframe with only balancing_authority_code_eia and plant_id_eia
     plants_entity_eia = plants_entity_eia[
         ["balancing_authority_code_eia", "plant_id_eia"]
@@ -1821,6 +1836,7 @@ def balancing_areas(
         the PUDL plants_entity_eia dictionary
     
     """
+
     # define function to get balancing_authority_code_eia from plant_id_eia
     def id_eia_to_bal_auth(plant_id_eia, plants_entity_eia_dict):
         if plant_id_eia in plants_entity_eia_dict.keys():
