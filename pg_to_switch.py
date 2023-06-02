@@ -1122,8 +1122,7 @@ def main(settings_file: str, results_folder: str):
         settings_list = []
         case_years = []
         case_start_years = []
-        for year in scenario_definitions.query("case_id == @case_id")["year"]:
-            # case_years.append(year)
+        for year in settings["model_year"]:
             case_years.append(scenario_settings[year][case_id]["model_year"])
             settings_list.append(scenario_settings[year][case_id])
             case_start_years.append(
