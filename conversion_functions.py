@@ -357,7 +357,7 @@ def gen_build_predetermined(
     gen_buildpre = gen_buildpre.loc[
         :,
         [
-            "index",
+            # "index",
             "GENERATION_PROJECT",
             "plant_id_eia",
             "Existing_Cap_MW",  # it was "Cap_Size",
@@ -616,7 +616,7 @@ def generation_projects_info(
     # gen_connect_cost_per_mw and gen_capacity_limit_mw
     gen_project_info = gen_project_info[
         [
-            "index",
+            # "index",
             "GENERATION_PROJECT",
             "technology",
             "region",
