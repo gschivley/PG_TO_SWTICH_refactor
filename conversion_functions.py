@@ -1770,6 +1770,7 @@ def transmission_lines_table(
     return transm_final
 
 
+    tx_cost_df["trans_efficiency"] = 1 - tx_cost_df["total_line_loss_frac"]
 def balancing_areas(
     pudl_engine,
     IPM_regions,

@@ -53,6 +53,7 @@ from conversion_functions import (
     graph_timestamp_map_table,
     graph_timestamp_map_kmeans,
     loads_table,
+    tx_cost_transform,
     variable_capacity_factors_table,
     transmission_lines_table,
     balancing_areas,
@@ -84,7 +85,6 @@ def fuel_files(
     fuel_emission_factors: Dict[str, float],
     out_folder: Path,
 ):
-
     fuel_cost = switch_fuel_cost_table(
         fuel_region_map,
         fuel_prices,
@@ -172,7 +172,6 @@ def gen_projects_info_file(
     out_folder: Path,
     gen_buildpre: pd.DataFrame,
 ):
-
     if settings.get("cogen_tech"):
         cogen_tech = settings["cogen_tech"]
     else:
@@ -851,7 +850,6 @@ def gen_prebuild_newbuild_info_files(
 
 
 def other_tables(period_start_list, period_end_list, atb_data_year, out_folder):
-
     # Based on REAM
     carbon_policies_data = {
         # "period": [2030, 2040, 2050],
@@ -912,76 +910,128 @@ from statistics import mean
 
 
 def transmission_tables(settings, out_folder, pg_engine):
-
     """
     pulling in information from PowerGenome transmission notebook
     Schivley Greg, PowerGenome, (2022), GitHub repository,
         https://github.com/PowerGenome/PowerGenome/blob/master/notebooks/Transmission.ipynb
     """
-    IPM_regions = settings["model_regions"]
+    model_regions = settings["model_regions"]
 
     transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
-    model_regions_gdf = load_ipm_shapefile(settings)
-
-    transmission_line_distance(
-        trans_constraints_df=transmission,
-        ipm_shapefile=model_regions_gdf,
-        settings=settings,
-    )
-
-    line_loss = network_line_loss(transmission=transmission, settings=settings)
-    reinforcement_cost = network_reinforcement_cost(
-        transmission=transmission, settings=settings
-    )
-    max_reinforcement = network_max_reinforcement(
-        transmission=transmission, settings=settings
-    )
-    transmission = agg_transmission_constraints(pg_engine=pg_engine, settings=settings)
-    add_cap = add_cap_res_network(transmission, settings)
 
     ## transmission lines
     # pulled from SWITCH load_zones file
     # need zone_dbid information to populate transmission_line column
-    def load_zones_table(IPM_regions, zone_ccs_distance_km):
+    def load_zones_table(regions, zone_ccs_distance_km):
         load_zones = pd.DataFrame(
             columns=["LOAD_ZONE", "zone_ccs_distance_km", "zone_dbid"]
         )
-        load_zones["LOAD_ZONE"] = IPM_regions
+        load_zones["LOAD_ZONE"] = regions
         load_zones["zone_ccs_distance_km"] = 0  # set to default 0
-        load_zones["zone_dbid"] = range(1, len(IPM_regions) + 1)
+        load_zones["zone_dbid"] = range(1, len(regions) + 1)
         return load_zones
 
-    IPM_regions = settings.get("model_regions")
-    load_zones = load_zones_table(IPM_regions, zone_ccs_distance_km=0)
+    model_regions = settings.get("model_regions")
+    load_zones = load_zones_table(model_regions, zone_ccs_distance_km=0)
     zone_dict = dict(
         zip(load_zones["LOAD_ZONE"].to_list(), load_zones["zone_dbid"].to_list())
     )
+    if not settings.get("user_transmission_costs"):
+        model_regions_gdf = load_ipm_shapefile(settings)
 
-    tx_capex_mw_mile_dict = settings.get("transmission_investment_cost")["tx"][
-        "capex_mw_mile"
-    ]
-
-    def region_avg(tx_capex_mw_mile_dict, region1, region2):
-        r1_value = tx_capex_mw_mile_dict[region1]
-        r2_value = tx_capex_mw_mile_dict[region2]
-        r_avg = mean([r1_value, r2_value])
-        return r_avg
-
-    def create_transm_line_col(lz1, lz2, zone_dict):
-        t_line = zone_dict[lz1] + "-" + zone_dict[lz2]
-        return t_line
-
-    transmission_lines = transmission_lines_table(
-        line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict, settings
-    )
-    transmission_lines
-
-    trans_capital_cost_per_mw_km = (
-        min(
-            settings.get("transmission_investment_cost")["tx"]["capex_mw_mile"].values()
+        transmission_line_distance(
+            trans_constraints_df=transmission,
+            ipm_shapefile=model_regions_gdf,
+            settings=settings,
         )
-        * 1.60934
-    )
+
+        line_loss = network_line_loss(transmission=transmission, settings=settings)
+        reinforcement_cost = network_reinforcement_cost(
+            transmission=transmission, settings=settings
+        )
+        max_reinforcement = network_max_reinforcement(
+            transmission=transmission, settings=settings
+        )
+        transmission = agg_transmission_constraints(
+            pg_engine=pg_engine, settings=settings
+        )
+        add_cap = add_cap_res_network(transmission, settings)
+
+        tx_capex_mw_mile_dict = settings.get("transmission_investment_cost")["tx"][
+            "capex_mw_mile"
+        ]
+
+        def region_avg(tx_capex_mw_mile_dict, region1, region2):
+            r1_value = tx_capex_mw_mile_dict[region1]
+            r2_value = tx_capex_mw_mile_dict[region2]
+            r_avg = mean([r1_value, r2_value])
+            return r_avg
+
+        def create_transm_line_col(lz1, lz2, zone_dict):
+            t_line = zone_dict[lz1] + "-" + zone_dict[lz2]
+            return t_line
+
+        transmission_lines = transmission_lines_table(
+            line_loss, add_cap, tx_capex_mw_mile_dict, zone_dict, settings
+        )
+        transmission_lines
+
+        trans_capital_cost_per_mw_km = (
+            min(
+                settings.get("transmission_investment_cost")["tx"][
+                    "capex_mw_mile"
+                ].values()
+            )
+            * 1.60934
+        )
+    else:
+        transmission_lines = pd.read_csv(
+            settings["input_folder"] / settings["user_transmission_costs"]
+        )
+        transmission_lines["tz1_dbid"] = transmission_lines["start_region"].map(
+            zone_dict
+        )
+
+        transmission["start_region"] = (
+            transmission["transmission_path_name"].str.split("_to_").str[0]
+        )
+        transmission["dest_region"] = (
+            transmission["transmission_path_name"].str.split("_to_").str[1]
+        )
+        transmission_lines = pd.merge(
+            transmission_lines,
+            transmission[["start_region", "dest_region", "Line_Max_Flow_MW"]],
+            how="left",
+        )
+        transmission_lines = tx_cost_transform(transmission_lines)
+        transmission_lines["tz2_dbid"] = transmission_lines["dest_region"].map(
+            zone_dict
+        )
+        transmission_lines = transmission_lines.rename(
+            columns={"start_region": "trans_lz1", "dest_region": "trans_lz2"}
+        )
+        transmission_lines["trans_dbid"] = range(1, len(transmission_lines) + 1)
+        transmission_lines["trans_derating_factor"] = 0.95
+        trans_capital_cost_per_mw_km = transmission_lines["cost_per_mw-km"].min()
+        transmission_lines["TRANSMISSION_LINE"] = (
+            transmission_lines["tz1_dbid"].astype(str)
+            + "-"
+            + transmission_lines["tz2_dbid"].astype(str)
+        )
+        transmission_lines = transmission_lines[
+            [
+                "TRANSMISSION_LINE",
+                "trans_lz1",
+                "trans_lz2",
+                "trans_length_km",
+                "trans_efficiency",
+                "existing_trans_cap",
+                "trans_dbid",
+                "trans_derating_factor",
+                "trans_terrain_multiplier",
+                "trans_new_build_allowed",
+            ]
+        ]
     trans_params_table = pd.DataFrame(
         {
             "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,
@@ -1002,7 +1052,6 @@ from statistics import mode
 
 
 def balancing_tables(settings, pudl_engine, all_gen, out_folder):
-
     IPM_regions = settings.get("model_regions")
     bal_areas, zone_bal_areas = balancing_areas(
         pudl_engine,
