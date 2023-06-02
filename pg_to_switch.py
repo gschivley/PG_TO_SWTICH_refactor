@@ -1094,8 +1094,8 @@ def main(settings_file: str, results_folder: str):
     settings = load_settings(path=settings_file)
     pudl_engine, pudl_out, pg_engine = init_pudl_connection(
         freq="AS",
-        start_year=min(settings.get("data_years")),
-        end_year=max(settings.get("data_years")),
+        start_year=min(settings.get("eia_data_years")),
+        end_year=max(settings.get("eia_data_years")),
     )
     check_settings(settings, pg_engine)
     input_folder = cwd / settings["input_folder"]
