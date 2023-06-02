@@ -1770,7 +1770,19 @@ def transmission_lines_table(
     return transm_final
 
 
+def tx_cost_transform(tx_cost_df):
+    tx_cost_df["cost_per_mw-km"] = (
+        tx_cost_df["total_interconnect_cost_mw"] / tx_cost_df["total_mw-km_per_mw"]
+    )
+    min_cost = tx_cost_df["cost_per_mw-km"].min()
+    tx_cost_df["trans_terrain_multiplier"] = tx_cost_df["cost_per_mw-km"] / min_cost
     tx_cost_df["trans_efficiency"] = 1 - tx_cost_df["total_line_loss_frac"]
+    tx_cost_df["trans_length_km"] = tx_cost_df["total_mw-km_per_mw"]
+    tx_cost_df["trans_new_build_allowed"] = 1
+    tx_cost_df["existing_trans_cap"] = tx_cost_df["Line_Max_Flow_MW"]
+    return tx_cost_df
+
+
 def balancing_areas(
     pudl_engine,
     IPM_regions,
