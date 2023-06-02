@@ -479,7 +479,7 @@ def gen_prebuild_newbuild_info_files(
     #     all_gen["plant_id_eia"].notna(), :
     # ]  # gc.create_region_technology_clusters()
     existing_gen = all_gen.loc[all_gen["Existing_Cap_MW"] > 0, :]
-    data_years = gc.settings.get("data_years", [])
+    data_years = gc.settings.get("eia_data_years", [])
     if not isinstance(data_years, list):
         data_years = [data_years]
     data_years = [str(y) for y in data_years]
