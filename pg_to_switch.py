@@ -32,7 +32,7 @@ from powergenome.external_data import (
     make_demand_response_profiles,
     make_generator_variability,
 )
-from powergenome.GenX import add_misc_gen_values
+from powergenome.GenX import add_misc_gen_values, add_co2_costs_to_o_m
 
 from conversion_functions import (
     switch_fuel_cost_table,
@@ -644,6 +644,7 @@ def gen_prebuild_newbuild_info_files(
         planning_period_start_yrs.append(settings["model_first_planning_year"])
 
     newgens = pd.concat(periods_dict["new_gen"], ignore_index=True)
+    newgens = add_co2_costs_to_o_m(newgens)
 
     build_yr_list = gen_build_with_id["build_year"].to_list()
     # using gen_build_with_id because it has plants that were removed for the final gen_build_pred. (ie. build year=2020)
