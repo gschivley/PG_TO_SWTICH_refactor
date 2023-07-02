@@ -32,7 +32,12 @@ from powergenome.external_data import (
     make_demand_response_profiles,
     make_generator_variability,
 )
-from powergenome.GenX import add_misc_gen_values, add_co2_costs_to_o_m
+from powergenome.GenX import (
+    add_misc_gen_values,
+    add_co2_costs_to_o_m,
+    create_policy_req,
+)
+
 
 from conversion_functions import (
     switch_fuel_cost_table,
@@ -850,19 +855,40 @@ def gen_prebuild_newbuild_info_files(
 ### edit by RR
 
 
-def other_tables(period_start_list, period_end_list, atb_data_year, out_folder):
-    # Based on REAM
-    carbon_policies_data = {
-        # "period": [2030, 2040, 2050],
-        # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
-        # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
-        # "carbon_cost_dollar_per_tco2": [".", ".", "."],
-        "period": [2050],
-        "carbon_cap_tco2_per_yr": [0],
-        "carbon_cap_tco2_per_yr_CA": [0],
-        "carbon_cost_dollar_per_tco2": ["."],
-    }
-    carbon_policies_table = pd.DataFrame(carbon_policies_data)
+def other_tables(
+    settings, period_start_list, period_end_list, atb_data_year, out_folder
+):
+    if settings.get("emission_policies_fn"):
+        model_year = settings["model_year"]
+        for i in model_year:
+            # energy_share_req = create_policy_req(_settings, col_str_match="ESR")
+            co2_cap = create_policy_req(settings, col_str_match="CO_2")
+            df = {
+                "period": [i],
+                "carbon_cap_tco2_per_yr": [
+                    co2_cap["CO_2_Max_Mtons_1"].sum() * 1000000
+                ],  # Mton to ton, the unit in PG is Mton; column name need to be updated.
+                "carbon_cap_tco2_per_yr_CA": [
+                    "."
+                ],  # change this value if the CA policy module is included.
+                "carbon_cost_dollar_per_tco2": [
+                    "."
+                ],  # change this value if you would like to look at the social cost instead og carbon cap.
+            }
+    else:  # Based on REAM
+        df = {
+            # "period": [2030, 2040, 2050],
+            # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
+            # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
+            # "carbon_cost_dollar_per_tco2": [".", ".", "."],
+            "period": [2050],
+            "carbon_cap_tco2_per_yr": [0],
+            "carbon_cap_tco2_per_yr_CA": [0],
+            "carbon_cost_dollar_per_tco2": ["."],
+        }
+
+    carbon_policies_table = pd.DataFrame(df)
+
     carbon_policies_table
 
     # interest and discount based on REAM
@@ -1119,6 +1145,10 @@ def main(settings_file: str, results_folder: str):
         case_folder = out_folder / case_id
         case_folder.mkdir(parents=True, exist_ok=True)
 
+        settings[
+            "case_id"
+        ] = case_id  # add by Rangrang to make 'GenX.create_policy_req' work for this script.
+
         settings_list = []
         case_years = []
         case_start_years = []
@@ -1149,6 +1179,7 @@ def main(settings_file: str, results_folder: str):
         )
         # other_tables(atb_data_year=settings["atb_data_year"], out_folder=case_folder)
         other_tables(
+            settings=settings,
             period_start_list=case_start_years,
             period_end_list=case_years,
             atb_data_year=settings["atb_data_year"],
