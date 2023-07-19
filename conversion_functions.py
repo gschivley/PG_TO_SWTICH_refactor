@@ -533,6 +533,8 @@ def gen_build_costs_table(existing_gen, newgens):
     # ].apply(lambda x: x * 1000)
     newgens["gen_fixed_om"] = newgens["Fixed_OM_Cost_per_MWyr"]
     newgens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
+    for col in ["capex_mw", "capex_mwh"]:
+        newgens[col] = newgens[col] * newgens["regional_cost_multiplier"]
     newgens.rename(
         columns={
             "capex_mw": "gen_overnight_cost",
