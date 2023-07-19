@@ -858,34 +858,34 @@ def gen_prebuild_newbuild_info_files(
 def other_tables(
     settings, period_start_list, period_end_list, atb_data_year, out_folder
 ):
-    if settings.get("emission_policies_fn"):
-        model_year = settings["model_year"]
-        for i in model_year:
-            # energy_share_req = create_policy_req(_settings, col_str_match="ESR")
-            co2_cap = create_policy_req(settings, col_str_match="CO_2")
-            df = {
-                "period": [i],
-                "carbon_cap_tco2_per_yr": [
-                    co2_cap["CO_2_Max_Mtons_1"].sum() * 1000000
-                ],  # Mton to ton, the unit in PG is Mton; column name need to be updated.
-                "carbon_cap_tco2_per_yr_CA": [
-                    "."
-                ],  # change this value if the CA policy module is included.
-                "carbon_cost_dollar_per_tco2": [
-                    "."
-                ],  # change this value if you would like to look at the social cost instead og carbon cap.
-            }
-    else:  # Based on REAM
-        df = {
-            # "period": [2030, 2040, 2050],
-            # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
-            # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
-            # "carbon_cost_dollar_per_tco2": [".", ".", "."],
-            "period": [2050],
-            "carbon_cap_tco2_per_yr": [0],
-            "carbon_cap_tco2_per_yr_CA": [0],
-            "carbon_cost_dollar_per_tco2": ["."],
-        }
+    # if settings.get("emission_policies_fn"):
+    #     model_year = settings["model_year"]
+    #     for i in model_year:
+    #         # energy_share_req = create_policy_req(_settings, col_str_match="ESR")
+    #         co2_cap = create_policy_req(settings, col_str_match="CO_2")
+    #         df = {
+    #             "period": [i],
+    #             "carbon_cap_tco2_per_yr": [
+    #                 co2_cap["CO_2_Max_Mtons_1"].sum() * 1000000
+    #             ],  # Mton to ton, the unit in PG is Mton; column name need to be updated.
+    #             "carbon_cap_tco2_per_yr_CA": [
+    #                 "."
+    #             ],  # change this value if the CA policy module is included.
+    #             "carbon_cost_dollar_per_tco2": [
+    #                 "."
+    #             ],  # change this value if you would like to look at the social cost instead og carbon cap.
+    #         }
+    # else:  # Based on REAM
+    df = {
+        # "period": [2030, 2040, 2050],
+        # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
+        # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
+        # "carbon_cost_dollar_per_tco2": [".", ".", "."],
+        "period": [2050],
+        "carbon_cap_tco2_per_yr": [0],
+        "carbon_cap_tco2_per_yr_CA": [0],
+        "carbon_cost_dollar_per_tco2": ["."],
+    }
 
     carbon_policies_table = pd.DataFrame(df)
 
@@ -1063,7 +1063,7 @@ def transmission_tables(settings, out_folder, pg_engine):
         {
             "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,
             "trans_lifetime_yrs": 60,  # it was 20, now change to 60 for national_emm comparison by RR
-            "trans_fixed_om_fraction": 0.03,
+            "trans_fixed_om_fraction": settings.get("trans_fixed_om_fraction", 0.03),
         },
         index=[0],
     )

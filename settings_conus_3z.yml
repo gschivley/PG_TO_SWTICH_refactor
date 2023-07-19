@@ -3,7 +3,7 @@
 # this would override the .env file
 RESOURCE_GROUPS: /Users/rangrang/Downloads/cpas
 hydro_variability_fn: regional_existing_hydro_profiles.csv # RR - download from Greg's google drive
-
+rans_fixed_om_fraction: 0
 # LOAD GROWTH ASSUMPTIONS
 #
 
@@ -514,8 +514,8 @@ target_usd_year: 2020
 # new-build generators from ATB are an average of costs from first to last (inclusive).
 # model_year: [2030, 2040, 2050]
 # model_first_planning_year: [2023, 2031, 2041]
-model_year: [2050]
-model_first_planning_year: [2041]
+model_year: [2030]
+model_first_planning_year: [2023]
 
 
 # HOURS OFFSET FROM UTC
@@ -921,28 +921,28 @@ retirement_ages: # TAYLOR - https://www.nrel.gov/docs/fy22osti/80641.pdf (pdf pa
   Flywheels: 200 #  40
   Offshore Wind Turbine: 200 #  30 # TD checked/no change
   Biomass: 200 #  50
-  NaturalGas_CCCCSAvgCF_Conservative: 200 #  60 # combined cycle and carbon capture sequestration
-  NaturalGas_CCAvgCF_Moderate: 200 #  60 # carbon capture
-  NaturalGas_CTAvgCF_Moderate: 200 #  50 # combustion turbine
-  Battery_*_Moderate: 200 #  15
-  NaturalGas_CCS100_Moderate: 200 #  60
-  UtilityPV_Class1_Moderate_100: 200 #  30
-  UtilityPV_Class1_Moderate: 200 #  30
-  LandbasedWind_Class1_Moderate: 200 #  30
-  LandbasedWind_Class1_Moderate_100: 200 #  30 
-  UtilityPV_Class1_Moderate_50: 200 #  30
-  OffShoreWind_Class1_Moderate: 200 #  30
-  OffShoreWind_Class3_Moderate_fixed_1: 200 #  30
-  OffShoreWind_Class3_Moderate_fixed_0: 200 #  30
-  OffShoreWind_Class12_Moderate_floating_1: 200 #  30
-  OffShoreWind_Class12_Moderate_floating_0: 200 #  30
-  Coal_CCS90AvgCF_Moderate: 200 #  60
-  Nuclear_Nuclear_Moderate: 200 #  60
-  LandbasedWind_Class3_Moderate: 200 #  30
-  OffShoreWind_Class12_Moderate: 200 #  30
-  OffShoreWind_Class3_Moderate: 200 #  30
-  Hydrogen_CTAvgCF_Moderate: 200 #  50
-  Hydrogen_CCAvgCF_Moderate: 200 #  60
+  NaturalGas_CCCCSAvgCF_Conservative: 30 #  60 # combined cycle and carbon capture sequestration
+  NaturalGas_CCAvgCF_Moderate: 30 #  60 # carbon capture
+  NaturalGas_CTAvgCF_Moderate: 30 #  50 # combustion turbine
+  Battery_*_Moderate: 15 #  15
+  NaturalGas_CCS100_Moderate: 30 #  60
+  UtilityPV_Class1_Moderate_100: 30 #  30
+  UtilityPV_Class1_Moderate: 30 #  30
+  LandbasedWind_Class1_Moderate: 30 #  30
+  LandbasedWind_Class1_Moderate_100: 30 #  30 
+  UtilityPV_Class1_Moderate_50: 30 #  30
+  OffShoreWind_Class1_Moderate: 30 #  30
+  OffShoreWind_Class3_Moderate_fixed_1: 30 #  30
+  OffShoreWind_Class3_Moderate_fixed_0: 30 #  30
+  OffShoreWind_Class12_Moderate_floating_1: 30 #  30
+  OffShoreWind_Class12_Moderate_floating_0: 30 #  30
+  Coal_CCS90AvgCF_Moderate: 30 #  60
+  Nuclear_Nuclear_Moderate: 40 #  60
+  LandbasedWind_Class3_Moderate: 30 #  30
+  OffShoreWind_Class12_Moderate: 30 #  30
+  OffShoreWind_Class3_Moderate: 30 #  30
+  Hydrogen_CTAvgCF_Moderate: 30 #  50
+  Hydrogen_CCAvgCF_Moderate: 30 #  60
   # Conventional Hydroelectric: 100 # TD update
   # Small Hydroelectric: 100 # TD update
   # Conventional Steam Coal: 65 # TD update

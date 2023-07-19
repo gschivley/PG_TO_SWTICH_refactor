@@ -1,0 +1,3 @@
+import pandas as pd
+parquet_file = "CONUS_extra_inputs/cluster cache files/BASN_LandbasedWind_Class3_Moderate__technology_landbasedwind_filter_feature_lcoe_max_75_bin_feature_lcoe_bins_0_40_55_76_cluster_feature_cf_n_clusters_2_method_agg__cluster_data.parquet"
+pd.read_parquet(parquet_file, engine = 'auto')

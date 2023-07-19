@@ -1405,7 +1405,7 @@ def hydro_time_tables(existing_gen, hydro_variability, timepoints_df, planning_y
     ####
 
     # get cap size for each hydro tech
-    hydro_Cap_Size = hydro_df["Cap_Size"].to_list()  # cap size for each hydro
+    hydro_Cap_Size = hydro_df["Existing_Cap_MW"].to_list()  # cap size for each hydro
     # multiply cap size by hourly
     for i in range(len(hydro_Cap_Size)):
         hydro_variability.iloc[:, i] = hydro_variability.iloc[:, i].apply(
