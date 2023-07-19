@@ -1015,6 +1015,24 @@ def transmission_tables(settings, out_folder, pg_engine):
         transmission_lines = pd.read_csv(
             settings["input_folder"] / settings["user_transmission_costs"]
         )
+        # Adjust dollar year of transmission costs
+        if settings.get("target_usd_year"):
+            adjusted_annuities = []
+            adjusted_costs = []
+            for row in transmission_lines.itertuples():
+                adj_annuity = inflation_price_adjustment(
+                    row.total_interconnect_annuity_mw, row.dollar_year, settings.get("target_usd_year")
+                ).round(0)
+                adjusted_annuities.append(adj_annuity)
+
+                adj_cost = inflation_price_adjustment(
+                    row.total_interconnect_cost_mw, row.dollar_year, settings.get("target_usd_year")
+                ).round(0)
+                adjusted_costs.append(adj_cost)
+            transmission_lines["total_interconnect_annuity_mw"] = adjusted_annuities
+            transmission_lines["total_interconnect_cost_mw"] = adjusted_costs
+            transmission_lines["adjusted_dollar_year"] = settings.get("target_usd_year")
+
         transmission_lines["tz1_dbid"] = transmission_lines["start_region"].map(
             zone_dict
         )
