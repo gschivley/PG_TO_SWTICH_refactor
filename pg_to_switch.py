@@ -26,6 +26,7 @@ from powergenome.util import (
 
 from powergenome.time_reduction import kmeans_time_clustering
 from powergenome.eia_opendata import fetch_fuel_prices
+from powergenome.eia_opendata import add_user_fuel_prices
 import geopandas as gpd
 from powergenome.generators import *
 from powergenome.external_data import (
@@ -34,6 +35,7 @@ from powergenome.external_data import (
 )
 from powergenome.GenX import (
     add_misc_gen_values,
+    hydro_energy_to_power,
     add_co2_costs_to_o_m,
     create_policy_req,
 )
@@ -65,6 +67,7 @@ from conversion_functions import (
     ts_tp_pg_kmeans,
     hydro_timepoints_pg_kmeans,
     hydro_timeseries_pg_kmeans,
+    hydro_system_module_tables,
     variable_cf_pg_kmeans,
     load_pg_kmeans,
 )
@@ -94,7 +97,7 @@ def fuel_files(
         fuel_region_map,
         fuel_prices,
         regions,
-        scenario="reference",
+        scenario=["reference", "user"],
         year_list=planning_years,
     )
 
@@ -466,6 +469,7 @@ def gen_projects_info_file(
 
 def gen_prebuild_newbuild_info_files(
     gc: GeneratorClusters,
+    all_fuel_prices,
     pudl_engine: sa.engine,
     settings_list: List[dict],
     case_years: List,
@@ -477,12 +481,24 @@ def gen_prebuild_newbuild_info_files(
     settings = settings_list[0]
     all_gen = gc.create_all_generators()
     all_gen = add_misc_gen_values(all_gen, settings)
+    all_gen = hydro_energy_to_power(
+        all_gen,
+        settings.get("hydro_factor"),
+        settings.get("regional_hydro_factor", {}),
+    )
     all_gen["Resource"] = all_gen["Resource"].str.rstrip("_")
     all_gen["technology"] = all_gen["technology"].str.rstrip("_")
     # all_gen["plant_id_eia"] = all_gen["plant_id_eia"].astype("Int64")
     # existing_gen = all_gen.loc[
     #     all_gen["plant_id_eia"].notna(), :
     # ]  # gc.create_region_technology_clusters()
+
+    ##### add for greenfield scenario, edit at 08/07/2023
+    if "Existing_Cap_MW" in all_gen.columns:
+        print("Existing_Cap_MW column exists")
+    else:
+        all_gen["Existing_Cap_MW"] = 0
+
     existing_gen = all_gen.loc[all_gen["Existing_Cap_MW"] > 0, :]
     data_years = gc.settings.get("eia_data_years", [])
     if not isinstance(data_years, list):
@@ -673,8 +689,14 @@ def gen_prebuild_newbuild_info_files(
         subset=["Resource"]
     )
     complete_gens = add_misc_gen_values(complete_gens, settings)
+    # complete_gens = hydro_energy_to_power(
+    #     complete_gens,
+    #     settings.get("hydro_factor"),
+    #     settings.get("regional_hydro_factor", {}),
+    # )
+
     gen_projects_info_file(
-        gc.fuel_prices, complete_gens, gc.settings, out_folder, gen_buildpre
+        all_fuel_prices, complete_gens, gc.settings, out_folder, gen_buildpre
     )
 
     ts_list = []
@@ -684,6 +706,11 @@ def gen_prebuild_newbuild_info_files(
     load_list = []
     vcf_list = []
     gts_map_list = []
+    water_nodes_list = []
+    water_connections_list = []
+    reservoirs_list = []
+    hydro_pj_list = []
+    water_node_tp_flows_list = []
     timepoint_start = 1
     for settings, period_lc, period_ng in zip(
         settings_list, periods_dict["load_curves"], periods_dict["new_gen"]
@@ -745,7 +772,20 @@ def gen_prebuild_newbuild_info_files(
                 ],
                 hydro_timepoints_df,
             )
-
+            (
+                water_nodes,
+                water_connections,
+                reservoirs,
+                hydro_pj,
+                water_node_tp_flows,
+            ) = hydro_system_module_tables(
+                period_all_gen,
+                period_variability.loc[
+                    :, period_all_gen.loc[period_all_gen["HYDRO"] == 1, "Resource"]
+                ],
+                hydro_timepoints_df,
+                flow_per_mw=1.02,
+            )
             vcf = variable_cf_pg_kmeans(
                 period_all_gen, period_variability, timepoints_df
             )
@@ -798,6 +838,20 @@ def gen_prebuild_newbuild_info_files(
             )
             hydro_timepoints_df
 
+            (
+                water_nodes,
+                water_connections,
+                reservoirs,
+                hydro_pj,
+                water_node_tp_flows,
+            ) = hydro_system_module_tables(
+                period_all_gen,
+                period_all_gen_variability.loc[
+                    :, period_all_gen.loc[period_all_gen["HYDRO"] == 1, "Resource"]
+                ],
+                timepoints_df,
+                flow_per_mw=1.02,
+            )
             loads, loads_with_year_hour = loads_table(
                 period_lc, timepoints_timestamp, timepoints_dict, settings["model_year"]
             )
@@ -828,6 +882,11 @@ def gen_prebuild_newbuild_info_files(
         hts_list.append(hydro_timeseries_table)
         load_list.append(loads)
         vcf_list.append(vcf)
+        water_nodes_list.append(water_nodes)
+        water_connections_list.append(water_connections)
+        reservoirs_list.append(reservoirs)
+        hydro_pj_list.append(hydro_pj)
+        water_node_tp_flows_list.append(water_node_tp_flows)
 
     if gts_map_list:
         graph_timestamp_map = pd.concat(gts_map_list, ignore_index=True)
@@ -839,6 +898,18 @@ def gen_prebuild_newbuild_info_files(
     hydro_timeseries_table = pd.concat(hts_list, ignore_index=True)
     loads = pd.concat(load_list, ignore_index=True)
     vcf = pd.concat(vcf_list, ignore_index=True)
+
+    water_nodes_df = pd.concat(water_nodes_list, ignore_index=True)
+    water_connections_df = pd.concat(water_connections_list, ignore_index=True)
+    reservoirs_df = pd.concat(reservoirs_list, ignore_index=True)
+    hydro_pj_df = pd.concat(hydro_pj_list, ignore_index=True)
+    water_node_tp_flows_df = pd.concat(water_node_tp_flows_list, ignore_index=True)
+
+    water_nodes_df.to_csv(out_folder / "water_nodes.csv", index=False)
+    water_connections_df.to_csv(out_folder / "water_connections.csv", index=False)
+    reservoirs_df.to_csv(out_folder / "reservoirs.csv", index=False)
+    hydro_pj_df.to_csv(out_folder / "hydro_generation_projects.csv", index=False)
+    water_node_tp_flows_df.to_csv(out_folder / "water_node_tp_flows.csv", index=False)
 
     timeseries_df.to_csv(out_folder / "timeseries.csv", index=False)
     timepoints_df.to_csv(out_folder / "timepoints.csv", index=False)
@@ -858,34 +929,34 @@ def gen_prebuild_newbuild_info_files(
 def other_tables(
     settings, period_start_list, period_end_list, atb_data_year, out_folder
 ):
-    # if settings.get("emission_policies_fn"):
-    #     model_year = settings["model_year"]
-    #     for i in model_year:
-    #         # energy_share_req = create_policy_req(_settings, col_str_match="ESR")
-    #         co2_cap = create_policy_req(settings, col_str_match="CO_2")
-    #         df = {
-    #             "period": [i],
-    #             "carbon_cap_tco2_per_yr": [
-    #                 co2_cap["CO_2_Max_Mtons_1"].sum() * 1000000
-    #             ],  # Mton to ton, the unit in PG is Mton; column name need to be updated.
-    #             "carbon_cap_tco2_per_yr_CA": [
-    #                 "."
-    #             ],  # change this value if the CA policy module is included.
-    #             "carbon_cost_dollar_per_tco2": [
-    #                 "."
-    #             ],  # change this value if you would like to look at the social cost instead og carbon cap.
-    #         }
-    # else:  # Based on REAM
-    df = {
-        # "period": [2030, 2040, 2050],
-        # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
-        # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
-        # "carbon_cost_dollar_per_tco2": [".", ".", "."],
-        "period": [2050],
-        "carbon_cap_tco2_per_yr": [0],
-        "carbon_cap_tco2_per_yr_CA": [0],
-        "carbon_cost_dollar_per_tco2": ["."],
-    }
+    if settings.get("emission_policies_fn"):
+        model_year = settings["model_year"]
+        for i in model_year:
+            # energy_share_req = create_policy_req(_settings, col_str_match="ESR")
+            co2_cap = create_policy_req(settings, col_str_match="CO_2")
+            df = {
+                "period": [i],
+                "carbon_cap_tco2_per_yr": [
+                    co2_cap["CO_2_Max_Mtons_1"].sum() * 1000000
+                ],  # Mton to ton, the unit in PG is Mton; column name need to be updated.
+                "carbon_cap_tco2_per_yr_CA": [
+                    "."
+                ],  # change this value if the CA policy module is included.
+                "carbon_cost_dollar_per_tco2": [
+                    "."
+                ],  # change this value if you would like to look at the social cost instead og carbon cap.
+            }
+    else:  # Based on REAM
+        df = {
+            # "period": [2030, 2040, 2050],
+            # "carbon_cap_tco2_per_yr": [149423302.5, 76328672.3, 0],
+            # "carbon_cap_tco2_per_yr_CA": [36292500, 11400000, 0],
+            # "carbon_cost_dollar_per_tco2": [".", ".", "."],
+            "period": [2050],
+            "carbon_cap_tco2_per_yr": [0],
+            "carbon_cap_tco2_per_yr_CA": [0],
+            "carbon_cost_dollar_per_tco2": ["."],
+        }
 
     carbon_policies_table = pd.DataFrame(df)
 
@@ -1021,12 +1092,16 @@ def transmission_tables(settings, out_folder, pg_engine):
             adjusted_costs = []
             for row in transmission_lines.itertuples():
                 adj_annuity = inflation_price_adjustment(
-                    row.total_interconnect_annuity_mw, row.dollar_year, settings.get("target_usd_year")
+                    row.total_interconnect_annuity_mw,
+                    row.dollar_year,
+                    settings.get("target_usd_year"),
                 ).round(0)
                 adjusted_annuities.append(adj_annuity)
 
                 adj_cost = inflation_price_adjustment(
-                    row.total_interconnect_cost_mw, row.dollar_year, settings.get("target_usd_year")
+                    row.total_interconnect_cost_mw,
+                    row.dollar_year,
+                    settings.get("target_usd_year"),
                 ).round(0)
                 adjusted_costs.append(adj_cost)
             transmission_lines["total_interconnect_annuity_mw"] = adjusted_annuities
@@ -1178,8 +1253,12 @@ def main(settings_file: str, results_folder: str):
             )
 
         gc = GeneratorClusters(pudl_engine, pudl_out, pg_engine, settings_list[0])
+        all_fuel_prices = add_user_fuel_prices(
+            scenario_settings[year][case_id], gc.fuel_prices
+        )
         gen_prebuild_newbuild_info_files(
             gc,
+            all_fuel_prices,
             pudl_engine,
             settings_list,
             case_years,
@@ -1188,7 +1267,7 @@ def main(settings_file: str, results_folder: str):
             hydro_variability_new,
         )
         fuel_files(
-            fuel_prices=gc.fuel_prices,
+            fuel_prices=all_fuel_prices,
             planning_years=case_years,
             regions=settings["model_regions"],
             fuel_region_map=settings["aeo_fuel_region_map"],
@@ -1203,7 +1282,12 @@ def main(settings_file: str, results_folder: str):
             atb_data_year=settings["atb_data_year"],
             out_folder=case_folder,
         )
-        transmission_tables(settings, case_folder, pg_engine)
+        transmission_tables(
+            settings,
+            # settings_list[0],
+            case_folder,
+            pg_engine,
+        )
 
 
 if __name__ == "__main__":

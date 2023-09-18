@@ -33,7 +33,7 @@ def switch_fuel_cost_table(
 
     ref_df = fuel_prices.copy()
     ref_df = ref_df.loc[
-        fuel_prices["scenario"] == scenario
+        fuel_prices["scenario"].isin(scenario)
     ]  # use reference scenario for now
     ref_df = ref_df[ref_df["year"].isin(year_list)]
     ref_df = ref_df.drop(["full_fuel_name", "scenario"], axis=1)
@@ -511,6 +511,7 @@ def gen_build_costs_table(existing_gen, newgens):
     existing["gen_overnight_cost"] = 0
     existing["gen_fixed_om"] = 0
     existing["gen_storage_energy_overnight_cost"] = 0
+    existing["gen_storage_energy_fixed_om"] = 0
     existing = existing[
         [
             "GENERATION_PROJECT",
@@ -518,6 +519,7 @@ def gen_build_costs_table(existing_gen, newgens):
             "gen_overnight_cost",
             "gen_fixed_om",
             "gen_storage_energy_overnight_cost",
+            "gen_storage_energy_fixed_om",
         ]
     ]
 
@@ -532,6 +534,10 @@ def gen_build_costs_table(existing_gen, newgens):
     #     "Fixed_OM_Cost_per_MWyr"
     # ].apply(lambda x: x * 1000)
     newgens["gen_fixed_om"] = newgens["Fixed_OM_Cost_per_MWyr"]
+    newgens["gen_storage_energy_fixed_om"] = newgens["Fixed_OM_Cost_per_MWhyr"]
+    newgens["gen_storage_energy_fixed_om"] = newgens[
+        "gen_storage_energy_fixed_om"
+    ].replace("", 0, regex=True)
     newgens.drop("Fixed_OM_Cost_per_MWyr", axis=1, inplace=True)
     for col in ["capex_mw", "capex_mwh"]:
         newgens[col] = newgens[col] * newgens["regional_cost_multiplier"]
@@ -550,6 +556,7 @@ def gen_build_costs_table(existing_gen, newgens):
             "gen_overnight_cost",
             "gen_fixed_om",
             "gen_storage_energy_overnight_cost",
+            "gen_storage_energy_fixed_om",
         ]
     ]
 
@@ -687,6 +694,12 @@ def generation_projects_info(
         "gen_store_to_release_ratio"
     ].fillna(".")
 
+    # add column for ccs
+    gen_project_info["gen_ccs_capture_efficiency"] = 0
+    gen_project_info.loc[
+        gen_project_info["technology"].str.contains("ccs", case=False),
+        "gen_ccs_capture_efficiency",
+    ] = 0.9
     # additional columns based on REAM
     gen_project_info["gen_min_build_capacity"] = 0  # REAM is just 0 or .
     gen_project_info[
@@ -790,9 +803,12 @@ def generation_projects_info(
 
 
 hydro_forced_outage_tech = {
-    "conventional_hydroelectric": 0.05,
-    "hydroelectric_pumped_storage": 0.05,
-    "small_hydroelectric": 0.05,
+    # "conventional_hydroelectric": 0.05,
+    # "hydroelectric_pumped_storage": 0.05,
+    # "small_hydroelectric": 0.05,
+    "conventional_hydroelectric": 0,
+    "hydroelectric_pumped_storage": 0,
+    "small_hydroelectric": 0,
 }
 
 
@@ -940,7 +956,7 @@ def hydro_timeseries_pg_kmeans(
     gen: pd.DataFrame,
     hydro_variability: pd.DataFrame,
     hydro_timepoints: pd.DataFrame,
-    outage_rate: float = 0.05,
+    outage_rate: float = 0,
 ) -> pd.DataFrame:
     """Create hydro timeseries table when using kmeans time reduction in PG
 
@@ -1470,6 +1486,119 @@ def hydro_time_tables(existing_gen, hydro_variability, timepoints_df, planning_y
     )
 
     return hydro_timepoints, hydro_timeseries
+
+
+def hydro_system_module_tables(
+    gen,
+    hydro_variability: pd.DataFrame,
+    hydro_timepoints: pd.DataFrame,
+    flow_per_mw: float = 1.02,
+) -> pd.DataFrame:
+    """
+    Create the tables specific for module hydro_system
+    Inputs:
+        1) flow_per_mw: 1/[(1000 kg/m3)(9.8 N/kg)(100 m)(1 MWs/1e6 Nm)] = 1.02 m3/s/MW
+        2) reservoir_capacity_m3 <- flow_per_mw * Hydro_Energy_to_Power_Ratio * [generator capacity (MW)]
+        3) inflow_m3_per_s <- flow_per_mw * [variable inflow (% of nameplate power)] * [generator capacity (MW)]
+    Output tables:
+        * water_modes.csv:
+            # add these rows, representing the reservoir upstream of each dam
+            WATER_NODES <- generator name + “_inlet” (or similar)
+            wn_is_sink <- 0
+            wnode_constant_consumption <- 0
+            wnode_constant_inflow <- 0
+        * water_nodes.csv:
+            # add a second set of rows to this file, representing reservoir downstream of each dam
+             WATER_NODES <- generator name + “_outlet” (or similar)
+            wn_is_sink <- 1
+            wnode_constant_consumption <- 0
+            wnode_constant_inflow <- 0
+        * water_connections.csv
+            WATER_CONNECTIONS <- generator name
+            water_node_from <- generator name + “_inlet”
+            water_node_to <- generator name + “_outlet”
+        *reservoirs.csv
+            RESERVOIRS <- generator name + “_inlet”
+            res_min_vol <- 0
+            res_max_vol <- reservoir_capacity_m3 (see above)
+            # arbitrarily assume reservoir must start and end at 50% full
+            initial_res_vol <- 0.5 * reservoir_capacity_m3
+            final_res_vol <- 0.5 * reservoir_capacity_m3
+        *hydro_generation_projects.csv
+            HYDRO_GENERATION_PROJECTS <- generator name (should match gen_info.csv)
+            # hydro_efficiency is MW output per m3/s of input
+            hydro_efficiency <- 1 / flow_per_mw
+            hydraulic_location <- generator name (should match water_connections.csv)
+        *water_node_tp_flows.csv
+            WATER_NODES <- generator name + “_inlet”
+            TIMEPOINTS <- timepoint
+            wnode_tp_inflow <- inflow_m3_per_s
+            wnode_tp_consumption <- 0
+    """
+    hydro_df = gen.copy()
+    hydro_df = hydro_df.loc[hydro_df["HYDRO"] == 1, :]
+
+    hydro_variability = hydro_variability.loc[:, hydro_df["Resource"]]
+
+    # for water_nodes.csv
+    water_nodes_in = pd.DataFrame()
+    water_nodes_in["WATER_NODES"] = hydro_df["Resource"] + "_inlet"
+    water_nodes_in["wn_is_sink"] = 0
+    water_nodes_in["wnode_constant_consumption"] = 0
+    water_nodes_in["wnode_constant_inflow"] = 0
+    water_nodes_out = pd.DataFrame()
+    water_nodes_out["WATER_NODES"] = hydro_df["Resource"] + "_outlet"
+    water_nodes_out["wn_is_sink"] = 1
+    water_nodes_out["wnode_constant_consumption"] = 0
+    water_nodes_out["wnode_constant_inflow"] = 0
+    water_nodes = pd.concat([water_nodes_in, water_nodes_out])
+    # for water_connections.csv
+    water_connections = pd.DataFrame()
+    water_connections["WATER_CONNECTIONS"] = hydro_df["Resource"]
+    water_connections["water_node_from"] = hydro_df["Resource"] + "_inlet"
+    water_connections["water_node_to"] = hydro_df["Resource"] + "_outlet"
+    water_connections["wc_capacity"] = hydro_df["Existing_Cap_MW"]
+
+    # for reservoirs.csv
+    reservoirs = pd.DataFrame()
+    reservoirs["RESERVOIRS"] = hydro_df["Resource"] + "_inlet"
+    reservoirs["res_min_vol"] = 0
+    # reservoirs["res_max_vol"] = "."
+    # reservoirs["initial_res_vol"] = "."
+    # reservoirs["final_res_vol"] = "."x
+    reservoirs["res_max_vol"] = (
+        flow_per_mw
+        * hydro_df["Hydro_Energy_to_Power_Ratio"]
+        * hydro_df["Existing_Cap_MW"]
+    )
+    reservoirs["initial_res_vol"] = 0.5 * reservoirs["res_max_vol"]
+    reservoirs["final_res_vol"] = 0.5 * reservoirs["res_max_vol"]
+    # for hydro_generation_projects.csv
+    hydro_pj = pd.DataFrame()
+    hydro_pj["HYDRO_GENERATION_PROJECTS"] = hydro_df["Resource"]
+    hydro_pj["hydro_efficiency"] = 1 / flow_per_mw
+    hydro_pj["hydraulic_location"] = hydro_df["Resource"]
+    # for water_node_tp_flows.csv
+    hydro_variability["TIMEPOINTS"] = hydro_timepoints["timepoint_id"].values
+    water_node_tp = hydro_variability.melt(id_vars=["TIMEPOINTS"])
+    water_node_tp["wnode_tp_inflow"] = (
+        flow_per_mw
+        * water_node_tp["value"]
+        * water_node_tp["Resource"].map(
+            hydro_df.set_index("Resource")["Existing_Cap_MW"]
+        )
+    )
+    water_node_tp["WATER_NODES"] = water_node_tp["Resource"] + "_inlet"
+    water_node_tp["wnode_tp_consumption"] = 0
+    cols = [
+        "WATER_NODES",
+        "TIMEPOINTS",
+        "wnode_tp_inflow",
+        "wnode_tp_consumption",
+    ]
+    water_node_tp_flows = water_node_tp[cols]
+
+    return water_nodes, water_connections, reservoirs, hydro_pj, water_node_tp_flows
 
 
 def graph_timestamp_map_table(timeseries_df, timestamp_interval):
