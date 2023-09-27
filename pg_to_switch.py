@@ -38,6 +38,7 @@ from powergenome.GenX import (
     hydro_energy_to_power,
     add_co2_costs_to_o_m,
     create_policy_req,
+    set_must_run_generation,
 )
 
 
@@ -717,6 +718,14 @@ def gen_prebuild_newbuild_info_files(
     ):
         period_all_gen = pd.concat([existing_gen, period_ng])
         period_all_gen_variability = make_generator_variability(period_all_gen)
+
+        if "gen_is_baseload" in period_all_gen.columns:
+            period_all_gen_variability = set_must_run_generation(
+                period_all_gen_variability,
+                period_all_gen.loc[
+                    period_all_gen["gen_is_baseload"] == True, "Resource"
+                ].to_list(),
+            )
         period_all_gen_variability.columns = period_all_gen["Resource"]
 
         # ####### add by Rangrang, need to discuss further about CF of hydros in MIS_D_MD
