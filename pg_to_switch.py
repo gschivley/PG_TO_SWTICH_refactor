@@ -40,6 +40,7 @@ from powergenome.GenX import (
     create_policy_req,
     set_must_run_generation,
 )
+from powergenome.co2_pipeline_cost import merge_co2_pipeline_costs
 
 
 from conversion_functions import (
@@ -658,6 +659,19 @@ def gen_prebuild_newbuild_info_files(
         period_ng["GENERATION_PROJECT"] = period_ng[
             "Resource"
         ]  # + f"_{settings['model_year']}"
+        if settings.get("co2_pipeline_filters") and settings.get(
+            "co2_pipeline_cost_fn"
+        ):
+            period_ng = merge_co2_pipeline_costs(
+                df=period_ng,
+                co2_data_path=settings["input_folder"]
+                / settings.get("co2_pipeline_cost_fn"),
+                co2_pipeline_filters=settings["co2_pipeline_filters"],
+                region_aggregations=settings.get("region_aggregations"),
+                fuel_emission_factors=settings["fuel_emission_factors"],
+                target_usd_year=settings.get("target_usd_year"),
+            )
+
         periods_dict["new_gen"].append(period_ng)
 
         period_lc = make_final_load_curves(pg_engine, settings)
