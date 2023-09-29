@@ -732,6 +732,7 @@ def gen_prebuild_newbuild_info_files(
     ):
         period_all_gen = pd.concat([existing_gen, period_ng])
         period_all_gen_variability = make_generator_variability(period_all_gen)
+        period_all_gen_variability.columns = period_all_gen["Resource"]
 
         if "gen_is_baseload" in period_all_gen.columns:
             period_all_gen_variability = set_must_run_generation(
@@ -740,7 +741,6 @@ def gen_prebuild_newbuild_info_files(
                     period_all_gen["gen_is_baseload"] == True, "Resource"
                 ].to_list(),
             )
-        period_all_gen_variability.columns = period_all_gen["Resource"]
 
         # ####### add by Rangrang, need to discuss further about CF of hydros in MIS_D_MD
         # change the variability of hyfro generators in MIS_D_MS
