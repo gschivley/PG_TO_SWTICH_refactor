@@ -40,6 +40,7 @@ from powergenome.GenX import (
     create_policy_req,
     set_must_run_generation,
 )
+from powergenome.co2_pipeline_cost import merge_co2_pipeline_costs
 
 
 from conversion_functions import (
@@ -658,6 +659,19 @@ def gen_prebuild_newbuild_info_files(
         period_ng["GENERATION_PROJECT"] = period_ng[
             "Resource"
         ]  # + f"_{settings['model_year']}"
+        if settings.get("co2_pipeline_filters") and settings.get(
+            "co2_pipeline_cost_fn"
+        ):
+            period_ng = merge_co2_pipeline_costs(
+                df=period_ng,
+                co2_data_path=settings["input_folder"]
+                / settings.get("co2_pipeline_cost_fn"),
+                co2_pipeline_filters=settings["co2_pipeline_filters"],
+                region_aggregations=settings.get("region_aggregations"),
+                fuel_emission_factors=settings["fuel_emission_factors"],
+                target_usd_year=settings.get("target_usd_year"),
+            )
+
         periods_dict["new_gen"].append(period_ng)
 
         period_lc = make_final_load_curves(pg_engine, settings)
@@ -718,6 +732,7 @@ def gen_prebuild_newbuild_info_files(
     ):
         period_all_gen = pd.concat([existing_gen, period_ng])
         period_all_gen_variability = make_generator_variability(period_all_gen)
+        period_all_gen_variability.columns = period_all_gen["Resource"]
 
         if "gen_is_baseload" in period_all_gen.columns:
             period_all_gen_variability = set_must_run_generation(
@@ -726,7 +741,6 @@ def gen_prebuild_newbuild_info_files(
                     period_all_gen["gen_is_baseload"] == True, "Resource"
                 ].to_list(),
             )
-        period_all_gen_variability.columns = period_all_gen["Resource"]
 
         # ####### add by Rangrang, need to discuss further about CF of hydros in MIS_D_MD
         # change the variability of hyfro generators in MIS_D_MS
