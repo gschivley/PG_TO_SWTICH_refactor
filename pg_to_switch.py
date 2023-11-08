@@ -733,7 +733,6 @@ def gen_prebuild_newbuild_info_files(
         period_all_gen = pd.concat([existing_gen, period_ng])
         period_all_gen_variability = make_generator_variability(period_all_gen)
         period_all_gen_variability.columns = period_all_gen["Resource"]
-
         if "gen_is_baseload" in period_all_gen.columns:
             period_all_gen_variability = set_must_run_generation(
                 period_all_gen_variability,
@@ -1141,11 +1140,29 @@ def transmission_tables(settings, out_folder, pg_engine):
         transmission["dest_region"] = (
             transmission["transmission_path_name"].str.split("_to_").str[1]
         )
+        # fix the values of existing_trans_cap for the mismatched rows
+        transmission_lines["line"] = (
+            transmission_lines["start_region"].astype(str)
+            + " "
+            + transmission_lines["dest_region"].astype(str)
+        )
+        transmission_lines["sorted_line"] = [
+            " ".join(sorted(x.split())) for x in transmission_lines["line"].tolist()
+        ]
+        transmission["line"] = (
+            transmission["start_region"].astype(str)
+            + " "
+            + transmission["dest_region"].astype(str)
+        )
+        transmission["sorted_line"] = [
+            " ".join(sorted(x.split())) for x in transmission["line"].tolist()
+        ]
         transmission_lines = pd.merge(
             transmission_lines,
-            transmission[["start_region", "dest_region", "Line_Max_Flow_MW"]],
+            transmission[["sorted_line", "Line_Max_Flow_MW"]],
             how="left",
         )
+
         transmission_lines = tx_cost_transform(transmission_lines)
         transmission_lines["tz2_dbid"] = transmission_lines["dest_region"].map(
             zone_dict
@@ -1175,6 +1192,10 @@ def transmission_tables(settings, out_folder, pg_engine):
                 "trans_new_build_allowed",
             ]
         ]
+        # transmission_lines["existing_trans_cap"] = transmission_lines[
+        #     "existing_trans_cap"
+        # ].replace("", 0)
+        transmission_lines.fillna(0, inplace=True)
     trans_params_table = pd.DataFrame(
         {
             "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,

@@ -643,6 +643,8 @@ def generation_projects_info(
             "gen_energy_source",
             "gen_is_cogen",
             "gen_is_baseload",
+            "gen_ccs_capture_efficiency",
+            "gen_ccs_energy_load",
             "gen_scheduled_outage_rate",
             "gen_forced_outage_rate",
             "gen_type",
@@ -651,7 +653,7 @@ def generation_projects_info(
 
     gen_project_info["gen_connect_cost_per_mw"] = gen_project_info[
         ["spur_capex", "interconnect_capex_mw"]
-    ].sum()
+    ].sum(axis=1)
 
     # create gen_connect_cost_per_mw from spur_miles and spur_capex_mw_mile
     gen_project_info["spur_capex_mw_mi"] = gen_project_info["region"].apply(
@@ -695,11 +697,11 @@ def generation_projects_info(
     ].fillna(".")
 
     # add column for ccs
-    gen_project_info["gen_ccs_capture_efficiency"] = 0
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("ccs", case=False),
-        "gen_ccs_capture_efficiency",
-    ] = 0.9
+    # gen_project_info["gen_ccs_capture_efficiency"] = 0
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].str.contains("ccs", case=False),
+    #     "gen_ccs_capture_efficiency",
+    # ] = 0.9
     # additional columns based on REAM
     gen_project_info["gen_min_build_capacity"] = 0  # REAM is just 0 or .
     gen_project_info[
@@ -778,6 +780,8 @@ def generation_projects_info(
         "gen_self_discharge_rate",
         "gen_discharge_efficiency",
         "gen_land_use_rate",
+        "gen_ccs_capture_efficiency",
+        "gen_ccs_energy_load",
         "gen_storage_energy_to_power_ratio",
         "gen_type",
     ]  # index
