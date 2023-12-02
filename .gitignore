@@ -99,7 +99,16 @@ venv.bak/
 *.pdf
 # Ignore notebooks, but not examples
 *.ipynb
-.DS_Store
 !/notebooks/*
-# Ignore csv data files
-*.csv 
+
+# Ignore all subdirectories (generally pipeline outputs) except extra_inputs
+# and settings dirs
+*/
+!*extra_inputs*/
+!*extra_inputs*/**
+!*settings*/
+!*settings*/**
+
+# macOS metadata (can make repository impossible to clone on Windows
+Icon?
+.DS_Store
