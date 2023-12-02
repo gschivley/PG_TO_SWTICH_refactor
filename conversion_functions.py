@@ -409,6 +409,24 @@ def gen_build_predetermined(
             axis=1,
         )
 
+    # Distributed generation and a few others are in all_gen with
+    # non-zero Existing_Cap_MW, but no plant_pudl_id and therefore
+    # no build_year or capacity_col. For now, we fill those in with
+    # dummy values for distributed generation (only) so they won't
+    # get dropped from the table below.
+    # TODO: fix this upstream in PowerGenome, e.g., create dummy plant
+    # construction info there in addition to the overall project info
+    # Note that Existing_Cap_MW is the cluster size, not the size of
+    # sub-units that were added over time, so this assumes there is only
+    # one cluster per resource.
+    mask = (
+        gen_buildpre['plant_pudl_id'].isna()
+        & (gen_buildpre['technology'] == 'distributed_generation')
+    )
+    gen_buildpre.loc[mask, 'build_year'] = 2022
+    gen_buildpre.loc[mask, capacity_col] = gen_buildpre['Existing_Cap_MW']
+
+
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
     #     new_builds = new_builds[['GENERATION_PROJECT', 'Existing_Cap_MW', 'Existing_Cap_MWh']]
@@ -424,7 +442,7 @@ def gen_build_predetermined(
     # filter to final columns
     # gen_build_with_id is an unmodified version of gen_build_pre (still has 2020 plant years)
     gen_build_with_id = gen_buildpre.copy()
-    gen_build_with_id = gen_buildpre[
+    gen_build_with_id = gen_build_with_id[
         [
             "GENERATION_PROJECT",
             "build_year",
