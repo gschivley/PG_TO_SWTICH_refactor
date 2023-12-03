@@ -428,14 +428,11 @@ def gen_projects_info_file(
 
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
-    gen_project_info["gen_full_load_heat_rate"] = gen_project_info.apply(
-        lambda row: "."
-        if row.gen_energy_source in non_fuel_energy
-        else row.gen_full_load_heat_rate,
-        axis=1,
-    )
+    gen_project_info.loc[
+        gen_project_info['gen_energy_source'].isin(non_fuel_energy),
+        "gen_full_load_heat_rate"
+    ] = '.'
 
-    # Do I need to set full load heat rate to "." for non-fuel energy generators?
     graph_tech_colors_table.to_csv(out_folder / "graph_tech_colors.csv", index=False)
     graph_tech_types_table.to_csv(out_folder / "graph_tech_types.csv", index=False)
     non_fuel_energy_table.to_csv(
