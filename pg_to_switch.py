@@ -44,6 +44,7 @@ from powergenome.co2_pipeline_cost import merge_co2_pipeline_costs
 
 
 from conversion_functions import (
+    derate_by_capacity_factor,
     switch_fuel_cost_table,
     switch_fuels,
     create_dict_plantgen,
@@ -582,6 +583,13 @@ def gen_prebuild_newbuild_info_files(
 
     # create copies of potential_build_yr (powergenome)
     pg_build = gc.units_model.copy()
+    if settings.get("derate_capacity"):
+        pg_build = derate_by_capacity_factor(
+            derate_techs=settings.get("derate_techs", []),
+            unit_df=pg_build,
+            existing_gen_df=existing_gen,
+            cap_col=settings.get("capacity_col", "capacity_mw"),
+        )
     pg_build = pg_build[
         [
             "plant_id_eia",
@@ -1236,7 +1244,12 @@ def balancing_tables(settings, pudl_engine, all_gen, out_folder):
     zone_bal_areas.to_csv(out_folder / "zone_balancing_areas.csv", index=False)
 
 
-def main(settings_file: str, results_folder: str):
+def main(
+    settings_file: str,
+    results_folder: str,
+    case_id: Annotated[List[str], typer.Option()] = None,
+    year: Annotated[List[float], typer.Option()] = None,
+):
     """Create inputs for the Switch model using PowerGenome data
 
     Parameters
