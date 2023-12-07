@@ -1,0 +1,3 @@
+case_id,year,flex_resource,ng_price,limitedtransmission,ira,min_cap,existing_clusters,hydrogen_gen,dac,time_reduction,policies,period_years,vre_clusters,econ_retirement,wacc,misc_file
+base_thin,2050,none,reference,no,no,none,thin,greenfield,yes,10_weeks,yes,ten,thin,no,standardize_5,no_ramp
+base_thin_operation,2050,none,reference,no,no,none,thin,greenfield,yes,none,yes,ten,thin,no,standardize_5,no_ramp

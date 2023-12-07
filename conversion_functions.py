@@ -183,89 +183,46 @@ def gen_build_predetermined(
     """
 
     """
-    Use dictionaries to get the build year from the various sources of information
+    Add columns for the operating year from the various sources of information
     """
 
-    # create dictionaries {plant_gen_id: date} from pudl_gen
-    plant_op_date_dict = create_dict_plantgen(
-        pudl_gen, "current_planned_operating_date"
-    )
-    plant_plan_ret_date_dict = create_dict_plantgen(pudl_gen, "planned_retirement_date")
-    plant_ret_date_dict = create_dict_plantgen(pudl_gen, "retirement_date")
+    # List of sources and destinations; will be searched with pg_build["plant_gen_id"]:
+    # (source_table, source_col, dest_col) or (lookup_dict, None, dest_col)
+    column_definitions = [
+        # based on pudl_gen
+        (pudl_gen, "current_planned_operating_date", "op_date"),
+        (pudl_gen, "planned_retirement_date", "plan_retire_date"),
+        (pudl_gen, "retirement_date", "retirement_date"),
+        # based on pudl_gen_entity
+        (pudl_gen_entity, "operating_date", "entity_op_date"),
+        # based on pg_build
+        (pg_build, "planned_retirement_date", "PG_pl_retire"),
+        (pg_build, "retirement_year", "PG_retire_yr"),
+        (pg_build, "operating_date", "PG_op_date"),
+        (pg_build, "operating_year", "PG_op_yr"),
+        # based on manual_build dictionary
+        (manual_build_yr, None, "manual_yr"),
+        # based on eia excel
+        (eia_Gen, "operating_year", "eia_gen_op_yr"),
+        (eia_Gen_prop, "planned_operating_year", "proposed_year"),
+        # based on eia excel manual dictionary
+        (plant_gen_manual, None, "eia_gen_manual_yr"),
+        (plant_gen_manual_proposed, None, "proposed_manual_year"),
+        (plant_gen_manual_retired, None, "eia_gen_retired_yr"),
+    ]
 
-    # create dictionaries {plant_gen_id: date} from pudl_gen_entity
-    entity_op_date_dict = create_dict_plantgen(pudl_gen_entity, "operating_date")
-
-    # create dictionaries {plant_gen_id: date} from pg_build
-    PG_pl_retire_date_dict = create_dict_plantgen(pg_build, "planned_retirement_date")
-    PG_retire_yr_dict = create_dict_plantgen(pg_build, "retirement_year")
-    PG_op_date_dict = create_dict_plantgen(pg_build, "operating_date")
-    PG_op_yr_dict = create_dict_plantgen(pg_build, "operating_year")
-
-    #  create dictionaries {plant_gen_id: date} from eia excel file
-    eia_Gen_dict = create_dict_plantgen(eia_Gen, "operating_year")
-    eia_Gen_prop_dict = create_dict_plantgen(eia_Gen_prop, "planned_operating_year")
-
-    """
-    Bring in dates based on dictionaries and the plant_gen_id column
-    """
-    # based on pudl_gen
-    pg_build["op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_op_date_dict)
-    )
-    pg_build["plan_retire_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_plan_ret_date_dict)
-    )
-    pg_build["retirement_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_ret_date_dict)
-    )
-
-    # based on pudl_gen_entity
-    pg_build["entity_op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, entity_op_date_dict)
-    )
-
-    # based on pg_build
-    pg_build["PG_pl_retire"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_pl_retire_date_dict)
-    )
-    pg_build["PG_retire_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_retire_yr_dict)
-    )
-    pg_build["PG_op_date"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_op_date_dict)
-    )
-    pg_build["PG_op_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, PG_op_yr_dict)
-    )
-
-    # based on manual_build
-    pg_build["manual_yr"] = pg_build["plant_id_eia"].apply(
-        lambda x: plant_dict(x, manual_build_yr)
-    )
-
-    # based on eia excel
-    pg_build["eia_gen_op_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, eia_Gen_dict)
-    )
-    pg_build["proposed_year"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, eia_Gen_prop_dict)
-    )
-
-    # based on eia excel manual dictionary
-    pg_build["eia_gen_manual_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual)
-    )
-    pg_build["proposed_manual_year"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual_proposed)
-    )
-    pg_build["eia_gen_retired_yr"] = pg_build["plant_gen_id"].apply(
-        lambda x: plant_dict(x, plant_gen_manual_retired)
-    )
+    for source_table, source_col, dest_col in column_definitions:
+        if isinstance(source_table, dict):
+            map_dict = source_table  # using a pre-supplied dictionary
+        else:
+            # create dict of {plant_gen_id: date} from source_table
+            map_dict = create_dict_plantgen(source_table, source_col)
+        # use a lookup to define the required column
+        pg_build[dest_col] = pg_build["plant_gen_id"].map(map_dict)
 
     """
     Manipulating the build and retirement year data
-        - change to year instead of date, 
+        - change to year instead of date,
         - bring all years into one column
         - remove nans
     """
@@ -372,7 +329,7 @@ def gen_build_predetermined(
     new_builds = gen_buildpre[gen_buildpre["Existing_Cap_MW"].isna()]
     gen_buildpre = gen_buildpre[gen_buildpre["Existing_Cap_MW"].notna()]
 
-    # create dictionary to go from pg_build to gen_buildpre (build_year)
+    # lookup build_year from pg_build
     gen_buildpre = pd.merge(
         gen_buildpre,
         pg_build[
@@ -409,6 +366,24 @@ def gen_build_predetermined(
             axis=1,
         )
 
+    # Distributed generation and a few others are in all_gen with
+    # non-zero Existing_Cap_MW, but no plant_pudl_id and therefore
+    # no build_year or capacity_col. For now, we fill those in with
+    # dummy values for distributed generation (only) so they won't
+    # get dropped from the table below.
+    # TODO: fix this upstream in PowerGenome, e.g., create dummy plant
+    # construction info there in addition to the overall project info
+    # Note that Existing_Cap_MW is the cluster size, not the size of
+    # sub-units that were added over time, so this assumes there is only
+    # one cluster per resource.
+    mask = (
+        gen_buildpre['plant_pudl_id'].isna()
+        & (gen_buildpre['technology'] == 'distributed_generation')
+    )
+    gen_buildpre.loc[mask, 'build_year'] = 2022
+    gen_buildpre.loc[mask, capacity_col] = gen_buildpre['Existing_Cap_MW']
+
+
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
     #     new_builds = new_builds[['GENERATION_PROJECT', 'Existing_Cap_MW', 'Existing_Cap_MWh']]
@@ -424,7 +399,7 @@ def gen_build_predetermined(
     # filter to final columns
     # gen_build_with_id is an unmodified version of gen_build_pre (still has 2020 plant years)
     gen_build_with_id = gen_buildpre.copy()
-    gen_build_with_id = gen_buildpre[
+    gen_build_with_id = gen_build_with_id[
         [
             "GENERATION_PROJECT",
             "build_year",
@@ -643,6 +618,8 @@ def generation_projects_info(
             "gen_energy_source",
             "gen_is_cogen",
             "gen_is_baseload",
+            "gen_ccs_capture_efficiency",
+            "gen_ccs_energy_load",
             "gen_scheduled_outage_rate",
             "gen_forced_outage_rate",
             "gen_type",
@@ -651,7 +628,7 @@ def generation_projects_info(
 
     gen_project_info["gen_connect_cost_per_mw"] = gen_project_info[
         ["spur_capex", "interconnect_capex_mw"]
-    ].sum()
+    ].sum(axis=1)
 
     # create gen_connect_cost_per_mw from spur_miles and spur_capex_mw_mile
     gen_project_info["spur_capex_mw_mi"] = gen_project_info["region"].apply(
@@ -695,11 +672,11 @@ def generation_projects_info(
     ].fillna(".")
 
     # add column for ccs
-    gen_project_info["gen_ccs_capture_efficiency"] = 0
-    gen_project_info.loc[
-        gen_project_info["technology"].str.contains("ccs", case=False),
-        "gen_ccs_capture_efficiency",
-    ] = 0.9
+    # gen_project_info["gen_ccs_capture_efficiency"] = 0
+    # gen_project_info.loc[
+    #     gen_project_info["technology"].str.contains("ccs", case=False),
+    #     "gen_ccs_capture_efficiency",
+    # ] = 0.9
     # additional columns based on REAM
     gen_project_info["gen_min_build_capacity"] = 0  # REAM is just 0 or .
     gen_project_info[
@@ -778,6 +755,8 @@ def generation_projects_info(
         "gen_self_discharge_rate",
         "gen_discharge_efficiency",
         "gen_land_use_rate",
+        "gen_ccs_capture_efficiency",
+        "gen_ccs_energy_load",
         "gen_storage_energy_to_power_ratio",
         "gen_type",
     ]  # index
@@ -1976,9 +1955,9 @@ def balancing_areas(
 
     """
     BALANCING_AREAS:
-    take the plant_id_eia column from all_gen input, and return the balancing authority using 
+    take the plant_id_eia column from all_gen input, and return the balancing authority using
         the PUDL plants_entity_eia dictionary
-    
+
     """
 
     # define function to get balancing_authority_code_eia from plant_id_eia

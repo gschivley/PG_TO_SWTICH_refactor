@@ -57,8 +57,63 @@ s = """
 #    'WECC_CO', 'WECC_ID', 'WECC_IID', 'WECC_MT', 'WECC_NM', 'WECC_NNV',
 #    'WECC_PNW', 'WECC_SCE', 'WECC_SNV', 'WECC_UT', 'WECC_WY')
 load_curves_efs = pd.read_sql_query(s, pg_engine)
-load_wecc2019 = load_curves_efs.loc[load_curves_efs["region"].str.contains("WEC")]
-load2019 = load_wecc2019.groupby("time_index").agg({"load_mw": "sum", "year": "first"})
+# load_wecc2019 = load_curves_efs.loc[load_curves_efs["region"].str.contains("WEC")]
+# load2019 = load_wecc2019.groupby("time_index").agg({"load_mw": "sum", "year": "first"})
+load2019 = load_curves_efs.copy()
+
+
+def get_month_group(hours):
+    if hours < 744:
+        return "Jan"
+    if hours >= 744 and hours < 1416:
+        return "Feb"
+    if hours >= 1416 and hours < 2160:
+        return "Mar"
+    if hours >= 2160 and hours < 2880:
+        return "Apr"
+    if hours >= 2880 and hours < 3624:
+        return "May"
+    if hours >= 3624 and hours < 4344:
+        return "Jun"
+    if hours >= 4344 and hours < 5088:
+        return "Jul"
+    if hours >= 5088 and hours < 5832:
+        return "Aug"
+    if hours >= 5832 and hours < 6552:
+        return "Sep"
+    if hours >= 6552 and hours < 7296:
+        return "Oct"
+    if hours >= 7296 and hours < 8016:
+        return "Nov"
+    if hours >= 8016 and hours <= 8760:
+        return "Dec"
+
+
+hourly2019 = load2019.groupby("time_index", as_index=False).agg(
+    {"load_mw": "sum", "time_index": "first", "year": "first"}
+)
+
+hourly2019["month"] = hourly2019["time_index"].apply(get_month_group)
+hourly2019["week"] = hourly2019.index.repeat(168)[: len(hourly2019)]
+hourly2019["week"] = hourly2019["week"] + 1
+hourly2019.to_csv(
+    "/Users/rangrang/Desktop/transmission_project/demand2019.csv", index=False
+)
+
+w_2019 = hourly2019.groupby("week", as_index=False).agg(
+    {"load_mw": "sum", "month": "first", "year": "first"}
+)
+w_2019.to_csv(
+    "/Users/rangrang/Desktop/transmission_project/weekly_demand2019.csv", index=False
+)
+m_2019 = hourly2019.groupby("month", as_index=False).agg(
+    {"load_mw": "sum", "month": "first", "year": "first"}
+)
+# load_wecc2019 = load_curves_efs.loc[load_curves_efs["region"].str.contains("WEC")]
+# load2019 = load_wecc2019.groupby("time_index").agg({"load_mw": "sum", "year": "first"})
+m_2019.to_csv(
+    "/Users/rangrang/Desktop/transmission_project/montly_demand2019.csv", index=False
+)
 
 
 ############# load 2050

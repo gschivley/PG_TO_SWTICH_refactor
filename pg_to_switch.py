@@ -38,7 +38,9 @@ from powergenome.GenX import (
     hydro_energy_to_power,
     add_co2_costs_to_o_m,
     create_policy_req,
+    set_must_run_generation,
 )
+from powergenome.co2_pipeline_cost import merge_co2_pipeline_costs
 
 
 from conversion_functions import (
@@ -426,14 +428,11 @@ def gen_projects_info_file(
 
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
-    gen_project_info["gen_full_load_heat_rate"] = gen_project_info.apply(
-        lambda row: "."
-        if row.gen_energy_source in non_fuel_energy
-        else row.gen_full_load_heat_rate,
-        axis=1,
-    )
+    gen_project_info.loc[
+        gen_project_info['gen_energy_source'].isin(non_fuel_energy),
+        "gen_full_load_heat_rate"
+    ] = '.'
 
-    # Do I need to set full load heat rate to "." for non-fuel energy generators?
     graph_tech_colors_table.to_csv(out_folder / "graph_tech_colors.csv", index=False)
     graph_tech_types_table.to_csv(out_folder / "graph_tech_types.csv", index=False)
     non_fuel_energy_table.to_csv(
@@ -657,6 +656,19 @@ def gen_prebuild_newbuild_info_files(
         period_ng["GENERATION_PROJECT"] = period_ng[
             "Resource"
         ]  # + f"_{settings['model_year']}"
+        if settings.get("co2_pipeline_filters") and settings.get(
+            "co2_pipeline_cost_fn"
+        ):
+            period_ng = merge_co2_pipeline_costs(
+                df=period_ng,
+                co2_data_path=settings["input_folder"]
+                / settings.get("co2_pipeline_cost_fn"),
+                co2_pipeline_filters=settings["co2_pipeline_filters"],
+                region_aggregations=settings.get("region_aggregations"),
+                fuel_emission_factors=settings["fuel_emission_factors"],
+                target_usd_year=settings.get("target_usd_year"),
+            )
+
         periods_dict["new_gen"].append(period_ng)
 
         period_lc = make_final_load_curves(pg_engine, settings)
@@ -718,6 +730,13 @@ def gen_prebuild_newbuild_info_files(
         period_all_gen = pd.concat([existing_gen, period_ng])
         period_all_gen_variability = make_generator_variability(period_all_gen)
         period_all_gen_variability.columns = period_all_gen["Resource"]
+        if "gen_is_baseload" in period_all_gen.columns:
+            period_all_gen_variability = set_must_run_generation(
+                period_all_gen_variability,
+                period_all_gen.loc[
+                    period_all_gen["gen_is_baseload"] == True, "Resource"
+                ].to_list(),
+            )
 
         # ####### add by Rangrang, need to discuss further about CF of hydros in MIS_D_MD
         # change the variability of hyfro generators in MIS_D_MS
@@ -1118,11 +1137,29 @@ def transmission_tables(settings, out_folder, pg_engine):
         transmission["dest_region"] = (
             transmission["transmission_path_name"].str.split("_to_").str[1]
         )
+        # fix the values of existing_trans_cap for the mismatched rows
+        transmission_lines["line"] = (
+            transmission_lines["start_region"].astype(str)
+            + " "
+            + transmission_lines["dest_region"].astype(str)
+        )
+        transmission_lines["sorted_line"] = [
+            " ".join(sorted(x.split())) for x in transmission_lines["line"].tolist()
+        ]
+        transmission["line"] = (
+            transmission["start_region"].astype(str)
+            + " "
+            + transmission["dest_region"].astype(str)
+        )
+        transmission["sorted_line"] = [
+            " ".join(sorted(x.split())) for x in transmission["line"].tolist()
+        ]
         transmission_lines = pd.merge(
             transmission_lines,
-            transmission[["start_region", "dest_region", "Line_Max_Flow_MW"]],
+            transmission[["sorted_line", "Line_Max_Flow_MW"]],
             how="left",
         )
+
         transmission_lines = tx_cost_transform(transmission_lines)
         transmission_lines["tz2_dbid"] = transmission_lines["dest_region"].map(
             zone_dict
@@ -1152,6 +1189,10 @@ def transmission_tables(settings, out_folder, pg_engine):
                 "trans_new_build_allowed",
             ]
         ]
+        # transmission_lines["existing_trans_cap"] = transmission_lines[
+        #     "existing_trans_cap"
+        # ].replace("", 0)
+        transmission_lines.fillna(0, inplace=True)
     trans_params_table = pd.DataFrame(
         {
             "trans_capital_cost_per_mw_km": trans_capital_cost_per_mw_km,

@@ -1,0 +1,7 @@
+case_id,year,flex_resource,ng_price,limitedtransmission,ira,min_cap,dac,existing_clusters,hydrogen_gen,time_reduction,policies,period_years,vre_clusters
+p01,2030,none,reference,no,no,none,no,full,none,10_days,yes,ten,full
+p01,2040,none,reference,no,no,none,no,full,none,10_days,yes,ten,full
+p01,2050,none,reference,no,no,none,yes,full,greenfield,10_days,yes,ten,full
+p02,2030,none,reference,no,no,none,no,full,none,10_days,none,ten,full
+p02,2040,none,reference,no,no,none,no,full,none,10_days,none,ten,full
+p02,2050,none,reference,no,no,none,no,full,none,10_days,none,ten,full
