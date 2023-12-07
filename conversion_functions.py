@@ -376,13 +376,11 @@ def gen_build_predetermined(
     # Note that Existing_Cap_MW is the cluster size, not the size of
     # sub-units that were added over time, so this assumes there is only
     # one cluster per resource.
-    mask = (
-        gen_buildpre['plant_pudl_id'].isna()
-        & (gen_buildpre['technology'] == 'distributed_generation')
+    mask = gen_buildpre["plant_pudl_id"].isna() & (
+        gen_buildpre["technology"] == "distributed_generation"
     )
-    gen_buildpre.loc[mask, 'build_year'] = 2022
-    gen_buildpre.loc[mask, capacity_col] = gen_buildpre['Existing_Cap_MW']
-
+    gen_buildpre.loc[mask, "build_year"] = 2022
+    gen_buildpre.loc[mask, capacity_col] = gen_buildpre["Existing_Cap_MW"]
 
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
@@ -2001,3 +1999,40 @@ def balancing_areas(
     )
 
     return BALANCING_AREAS, ZONE_BALANCING_AREAS
+
+
+def derate_by_capacity_factor(
+    derate_techs: List[str],
+    unit_df: pd.DataFrame,
+    existing_gen_df: pd.DataFrame,
+    cap_col: str,
+) -> pd.DataFrame:
+    """Derate unit capacities by the average region capacity factor for a technology
+
+    Parameters
+    ----------
+    derate_techs : List[str]
+        List of technology names that will be derated by capacity factor
+    unit_df : pd.DataFrame
+        Individual generator units. Should have columns 'technology' and 'model_region'
+    existing_gen_df : pd.DataFrame
+        Clustered technologies with columns 'technology', 'region', and 'capacity_factor'
+    cap_col : str
+        Name of column with capacity values
+
+    Returns
+    -------
+    pd.DataFrame
+        Modified version of unit_df
+    """
+    assert "capacity_factor" in existing_gen_df.columns
+    for tech in derate_techs:
+        for idx, row in existing_gen_df.loc[
+            existing_gen_df["technology"] == tech, :
+        ].iterrows():
+            unit_df.loc[
+                (unit_df["technology"] == tech)
+                & (unit_df["model_region"] == row["region"]),
+                cap_col,
+            ] *= row["capacity_factor"]
+    return unit_df
