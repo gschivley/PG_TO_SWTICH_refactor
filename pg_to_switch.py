@@ -430,9 +430,9 @@ def gen_projects_info_file(
     # non_fuel_energy_table = pd.DataFrame(non_fuel_energy, columns=['energy_source'])
 
     gen_project_info.loc[
-        gen_project_info['gen_energy_source'].isin(non_fuel_energy),
-        "gen_full_load_heat_rate"
-    ] = '.'
+        gen_project_info["gen_energy_source"].isin(non_fuel_energy),
+        "gen_full_load_heat_rate",
+    ] = "."
 
     graph_tech_colors_table.to_csv(out_folder / "graph_tech_colors.csv", index=False)
     graph_tech_types_table.to_csv(out_folder / "graph_tech_types.csv", index=False)

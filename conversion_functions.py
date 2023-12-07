@@ -376,13 +376,11 @@ def gen_build_predetermined(
     # Note that Existing_Cap_MW is the cluster size, not the size of
     # sub-units that were added over time, so this assumes there is only
     # one cluster per resource.
-    mask = (
-        gen_buildpre['plant_pudl_id'].isna()
-        & (gen_buildpre['technology'] == 'distributed_generation')
+    mask = gen_buildpre["plant_pudl_id"].isna() & (
+        gen_buildpre["technology"] == "distributed_generation"
     )
-    gen_buildpre.loc[mask, 'build_year'] = 2022
-    gen_buildpre.loc[mask, capacity_col] = gen_buildpre['Existing_Cap_MW']
-
+    gen_buildpre.loc[mask, "build_year"] = 2022
+    gen_buildpre.loc[mask, capacity_col] = gen_buildpre["Existing_Cap_MW"]
 
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
