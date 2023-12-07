@@ -7,12 +7,13 @@ from datetime import datetime as dt
 import ast
 import itertools
 from statistics import mode
-
+from typing import List, Optional
 
 from powergenome.resource_clusters import ResourceGroup
 from pathlib import Path
 import sqlalchemy as sa
 import typer
+from typing_extensions import Annotated
 
 import pandas as pd
 from powergenome.fuels import fuel_cost_table
@@ -1236,8 +1237,17 @@ def balancing_tables(settings, pudl_engine, all_gen, out_folder):
     zone_bal_areas.to_csv(out_folder / "zone_balancing_areas.csv", index=False)
 
 
-def main(settings_file: str, results_folder: str):
+def main(
+    settings_file: str,
+    results_folder: str,
+    case_id: Annotated[List[str], typer.Option()] = None,
+    year: Annotated[List[float], typer.Option()] = None,
+):
     """Create inputs for the Switch model using PowerGenome data
+
+    Example usage:
+
+    $ python pg_to_switch.py settings results --case-id case1 --case-id case2 --year 2030
 
     Parameters
     ----------
@@ -1245,6 +1255,12 @@ def main(settings_file: str, results_folder: str):
         The path to a YAML file or folder of YAML files with settings parameters
     results_folder : str
         The folder where results will be saved
+    case_id : Annotated[List[str], typer.Option, optional
+        A list of case IDs, by default None. If using from CLI, provide a single case ID
+        after each flag
+    year : Annotated[List[float], typer.Option, optional
+        A list of years, by default None. If using from CLI, provide a single year
+        after each flag
     """
     cwd = Path.cwd()
     out_folder = cwd / results_folder
@@ -1253,6 +1269,27 @@ def main(settings_file: str, results_folder: str):
     # cases/years
 
     settings = load_settings(path=settings_file)
+    if year is None:
+        year = settings["model_year"]
+    else:
+        remove_model_years = []
+        remove_start_years = []
+        for model_year, start_year in zip(
+            settings["model_year"], settings["model_first_planning_year"]
+        ):
+            if model_year not in year:
+                # Create lists of years to remove.
+                remove_model_years.append(model_year)
+                remove_start_years.append(start_year)
+
+        settings["model_year"] = [
+            y for y in settings["model_year"] if y not in remove_model_years
+        ]
+        settings["model_first_planning_year"] = [
+            y
+            for y in settings["model_first_planning_year"]
+            if y not in remove_start_years
+        ]
     pudl_engine, pudl_out, pg_engine = init_pudl_connection(
         freq="AS",
         start_year=min(settings.get("eia_data_years")),
@@ -1264,6 +1301,10 @@ def main(settings_file: str, results_folder: str):
     scenario_definitions = pd.read_csv(
         input_folder / settings["scenario_definitions_fn"]
     )
+    if case_id:
+        scenario_definitions = scenario_definitions.loc[
+            scenario_definitions["case_id"].isin(case_id), :
+        ]
     scenario_settings = build_scenario_settings(settings, scenario_definitions)
 
     # load hydro_variability_new, and need to add varibality for region 'MIS_D_MS'
