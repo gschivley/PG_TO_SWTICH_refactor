@@ -608,6 +608,7 @@ def generation_projects_info(
             "Existing_Cap_MW",
             "spur_capex",
             "interconnect_capex_mw",
+            "co2_pipeline_capex_mw",
             "Eff_Up",
             "Eff_Down",
             "VRE",
@@ -624,8 +625,9 @@ def generation_projects_info(
         ]
     ]
 
+    # Include co2 pipeline costs as part of connection -- could also be in build capex
     gen_project_info["gen_connect_cost_per_mw"] = gen_project_info[
-        ["spur_capex", "interconnect_capex_mw"]
+        ["spur_capex", "interconnect_capex_mw", "co2_pipeline_capex_mw"]
     ].sum(axis=1)
 
     # create gen_connect_cost_per_mw from spur_miles and spur_capex_mw_mile
