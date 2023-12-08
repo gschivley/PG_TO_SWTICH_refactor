@@ -376,13 +376,11 @@ def gen_build_predetermined(
     # Note that Existing_Cap_MW is the cluster size, not the size of
     # sub-units that were added over time, so this assumes there is only
     # one cluster per resource.
-    mask = (
-        gen_buildpre['plant_pudl_id'].isna()
-        & (gen_buildpre['technology'] == 'distributed_generation')
+    mask = gen_buildpre["plant_pudl_id"].isna() & (
+        gen_buildpre["technology"] == "distributed_generation"
     )
-    gen_buildpre.loc[mask, 'build_year'] = 2022
-    gen_buildpre.loc[mask, capacity_col] = gen_buildpre['Existing_Cap_MW']
-
+    gen_buildpre.loc[mask, "build_year"] = 2022
+    gen_buildpre.loc[mask, capacity_col] = gen_buildpre["Existing_Cap_MW"]
 
     # don't include new builds in gen_build_predetermined
     #     new_builds['GENERATION_PROJECT'] = range(gen_buildpre.shape[0]+1, gen_buildpre.shape[0]+1+new_builds.shape[0])
@@ -610,6 +608,7 @@ def generation_projects_info(
             "Existing_Cap_MW",
             "spur_capex",
             "interconnect_capex_mw",
+            "co2_pipeline_capex_mw",
             "Eff_Up",
             "Eff_Down",
             "VRE",
@@ -626,8 +625,9 @@ def generation_projects_info(
         ]
     ]
 
+    # Include co2 pipeline costs as part of connection -- could also be in build capex
     gen_project_info["gen_connect_cost_per_mw"] = gen_project_info[
-        ["spur_capex", "interconnect_capex_mw"]
+        ["spur_capex", "interconnect_capex_mw", "co2_pipeline_capex_mw"]
     ].sum(axis=1)
 
     # create gen_connect_cost_per_mw from spur_miles and spur_capex_mw_mile
